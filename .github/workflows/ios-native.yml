@@ -7,6 +7,13 @@ on:
       - 'librmx/**'
       - 'framework/**'
       - '.github/workflows/ios-native.yml'
+  pull_request:
+    branches: [ios-native]
+    paths:
+      - 'Oxygen/**'
+      - 'librmx/**'
+      - 'framework/**'
+      - '.github/workflows/ios-native.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -89,7 +96,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
-          RELEASE_TAG: ios-v0.2.4
+          RELEASE_TAG: ios-v0.2.5
         shell: bash
         run: |
           set -euo pipefail
@@ -107,6 +114,6 @@ jobs:
           else
             gh release create "$RELEASE_TAG" "$ipa_file" \
               --target "$SOURCE_SHA" --prerelease \
-              --title "Sonic 3 A.I.R. iOS 0.2.4 (experimental)" \
+              --title "Sonic 3 A.I.R. iOS 0.2.5 (experimental)" \
               --notes-file Oxygen/sonic3air/build/_ios/RELEASE_NOTES.md
           fi

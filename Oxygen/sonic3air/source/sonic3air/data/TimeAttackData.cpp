@@ -111,7 +111,7 @@ std::wstring TimeAttackData::getSavePath(uint16 zoneAndAct, uint8 category, std:
 	{
 		*outRecBaseFilename = *String(zoneAndActName + "_" + characterName).toWString();
 	}
-	return ClassicModeRules::saveRoot(Configuration::instance().mAppDataPath, Configuration::instance().mClassicMode) + *String("timeattack/" + zoneAndActName + "_" + characterName).toWString();
+	return ClassicModeRules::saveRoot(Configuration::instance().mAppDataPath, Configuration::instance().mClassicMode, Configuration::instance().mSharedModeSaves) + *String("timeattack/" + zoneAndActName + "_" + characterName).toWString();
 }
 
 std::string TimeAttackData::getTimeString(uint32 frames, int formatOption)

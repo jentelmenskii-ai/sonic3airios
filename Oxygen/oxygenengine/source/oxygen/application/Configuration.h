@@ -196,6 +196,7 @@ public:
 	int  mStartPhase = 0;
 	// Persisted by the Sonic game; presentation is 30 FPS, simulation stays 60 Hz.
 	bool mClassicMode = false;
+	bool mSharedModeSaves = false;
 	bool mClassicMenuActive = false; // Runtime UI state, not part of save data.
 	int  mSimulationFrequency = 60;
 	GameRecorder mGameRecorder;

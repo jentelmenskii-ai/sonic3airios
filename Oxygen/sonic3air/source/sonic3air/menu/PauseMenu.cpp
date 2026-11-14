@@ -58,6 +58,8 @@ void PauseMenu::setBaseState(BaseState baseState)
 
 void PauseMenu::onFadeIn()
 {
+	mReplaySavePrompt = false;
+	mScreenshotMode = false;
 	mState = State::APPEAR;
 	mVisibility = 0.0f;
 	mDialogVisibility = 0.0f;
@@ -73,7 +75,7 @@ void PauseMenu::onFadeIn()
 		mMenuEntries.addEntry("Continue", 0);
 		if (mRestartEnabled)
 			mMenuEntries.addEntry("Restart", 2);
-		if (!Game::instance().isInTimeAttackMode())
+		if (!Game::instance().isInTimeAttackMode() && !Game::instance().isPlayingReplay())
 			mMenuEntries.addEntry("Options", 1);
 		mMenuEntries.addEntry("Exit Game", 3);
 	}
@@ -103,6 +105,16 @@ void PauseMenu::update(float timeElapsed)
 	if (mState == State::SHOW)
 	{
 		const InputManager::ControllerScheme& keys = InputManager::instance().getController(0);
+		if (mReplaySavePrompt)
+		{
+			mMenuEntries.update();
+			if (keys.A.justPressed() || keys.X.justPressed() || keys.Start.justPressed() || keys.B.justPressed() || keys.Back.justPressed())
+			{
+				const bool save = !keys.B.justPressed() && !keys.Back.justPressed() && mMenuEntries.selected().mData == 1;
+				if (Game::instance().finishReplayRecording(save)) { mReplaySavePrompt = false; resumeGame(); }
+			}
+			return;
+		}
 		if (mScreenshotMode)
 		{
 			if (InputManager::instance().anythingPressed())
@@ -365,6 +377,15 @@ void PauseMenu::render()
 
 		drawer.performRendering();
 	}
+}
+
+void PauseMenu::showReplaySavePrompt()
+{
+	mReplaySavePrompt = true;
+	mMenuEntries.clear();
+	mMenuEntries.addEntry("Save Replay", 1);
+	mMenuEntries.addEntry("Do Not Save", 0);
+	mMenuEntries.mSelectedEntryIndex = 0;
 }
 
 void PauseMenu::onReturnFromOptions()

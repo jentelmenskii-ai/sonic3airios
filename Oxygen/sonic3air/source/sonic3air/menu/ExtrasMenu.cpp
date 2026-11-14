@@ -21,11 +21,15 @@
 #include "oxygen/engine/EngineMain.h"
 #include "oxygen/helper/FileHelper.h"
 #include "oxygen/helper/Utils.h"
+#include "oxygen/platform/PlatformFunctions.h"
+#include "sonic3air/data/TimeAttackData.h"
+#include <ctime>
 
 
 namespace
 {
 	static constexpr int BACK = 0xffff;
+	static constexpr int REPLAYS = 0xfffe;
 
 	bool showExtrasMenuTabContent(int tabIndex)
 	{
@@ -92,6 +96,9 @@ void ExtrasMenu::setBaseState(BaseState baseState)
 
 void ExtrasMenu::onFadeIn()
 {
+	mBrowsingReplays = false;
+	mReplayLaunchFilename.clear();
+	mReplayDeleteIndex = -1;
 	mDescriptionLinesCache.clear();
 	mState = State::APPEAR;
 
@@ -125,6 +132,7 @@ void ExtrasMenu::onFadeIn()
 			}
 		}
 
+		entries.addEntry("Replays", REPLAYS);
 		entries.addEntry("Back", BACK);
 	}
 
@@ -207,7 +215,8 @@ void ExtrasMenu::update(float timeElapsed)
 	mActiveTabAnimated += clamp((float)mActiveTab - mActiveTabAnimated, -timeElapsed * 4.0f, timeElapsed * 4.0f);
 
 	// Don't react to input during transitions
-	if (mState == State::SHOW)
+	if (mState == State::SHOW && mBrowsingReplays) updateReplayBrowser();
+	else if (mState == State::SHOW)
 	{
 		const InputManager::ControllerScheme& keys = InputManager::instance().getController(0);
 
@@ -276,7 +285,14 @@ void ExtrasMenu::update(float timeElapsed)
 			{
 				Tab& tab = mTabs[mActiveTab];
 				const GameMenuEntry& selectedEntry = tab.mMenuEntries.selected();
-				if (mActiveTab == 0 &&
+				if (mActiveTab == 0 && selectedEntry.mData == REPLAYS)
+				{
+					mBrowsingReplays = true;
+					mReplayZone = -1;
+					mReplays = Game::instance().listReplays();
+					rebuildReplayEntries();
+				}
+				else if (mActiveTab == 0 &&
 					PlayerProgress::instance().mUnlocks.isSecretUnlocked(selectedEntry.mData) &&
 					(selectedEntry.mData == SharedDatabase::Secret::SECRET_COMPETITION_MODE ||
 					 selectedEntry.mData == SharedDatabase::Secret::SECRET_BLUE_SPHERE ||
@@ -320,7 +336,24 @@ void ExtrasMenu::update(float timeElapsed)
 	{
 		if (updateFadeOut(timeElapsed * 4.0f))
 		{
-			if (mState == State::FADE_TO_GAME && mActiveTab == 0)
+			if (!mReplayLaunchFilename.empty())
+			{
+				const auto filename = mReplayLaunchFilename;
+				mReplayLaunchFilename.clear();
+				if (Game::instance().playReplay(filename))
+				{
+					GameApp::instance().onStartGame();
+					mMenuBackground->setGameStartedMenu();
+				}
+				else
+				{
+					mState = State::SHOW;
+					mVisibility = 1.0f;
+					GameApp::instance().getGameView().setFadedIn();
+					return;
+				}
+			}
+			else if (mState == State::FADE_TO_GAME && mActiveTab == 0)
 			{
 				const GameMenuEntry& selectedEntry = mTabs[mActiveTab].mMenuEntries.selected();
 				if (PlayerProgress::instance().mUnlocks.isSecretUnlocked(selectedEntry.mData))
@@ -348,6 +381,7 @@ void ExtrasMenu::update(float timeElapsed)
 
 void ExtrasMenu::render()
 {
+	if (mBrowsingReplays) { renderReplayBrowser(); return; }
 	GuiBase::render();
 
 	Drawer& drawer = EngineMain::instance().getDrawer();
@@ -408,6 +442,12 @@ void ExtrasMenu::render()
 				py += (tabIndex < 2) ? 22 : 16;
 				drawer.printText(global::mOxyfontRegular, Recti(baseX, py, 0, 10), entry.mText, 5, color);
 				py += 16;
+			}
+			else if (tabIndex == Tab::Id::EXTRAS && entry.mData == REPLAYS)
+			{
+				py += 18;
+				drawer.printText(global::mSonicFontC, Recti(baseX, py, 0, 20), "REPLAYS", 5, color);
+				py += 26;
 			}
 			else if (tabIndex == Tab::Id::EXTRAS)
 			{
@@ -659,4 +699,133 @@ void ExtrasMenu::goBack()
 	playMenuSound(0xad);
 	mMenuBackground->openMainMenu();
 	mState = State::FADE_TO_MENU;
+}
+
+
+void ExtrasMenu::rebuildReplayEntries()
+{
+    mReplayDeleteIndex = -1;
+    mReplayEntries.clear();
+    if (mReplayZone < 0)
+    {
+        int previous = -1;
+        for (const auto& entry : mReplays)
+        {
+            const int zoneIndex = entry.data.zoneAct >> 8;
+            if (zoneIndex == previous) continue;
+            previous = zoneIndex;
+            const auto* zone = SharedDatabase::getZoneByInternalIndex(uint8(zoneIndex));
+            mReplayEntries.addEntry(zone ? zone->mDisplayName : "Unknown Zone", uint32(zoneIndex));
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < mReplays.size(); ++i)
+        {
+            const auto& entry = mReplays[i];
+            if ((entry.data.zoneAct >> 8) != mReplayZone) continue;
+            const std::string title = "Act " + std::to_string((entry.data.zoneAct & 0xff) + 1) + "  " +
+                TimeAttackData::getTimeString(entry.data.actTime) + (entry.data.classic ? "  Classic" : "  Anniversary");
+            mReplayEntries.addEntry(title, uint32(i));
+        }
+    }
+    mReplayEntries.addEntry("Back", BACK);
+    mReplayEntries.mSelectedEntryIndex = 0;
+}
+
+void ExtrasMenu::updateReplayBrowser()
+{
+    const auto& keys = InputManager::instance().getController(0);
+    const bool accept = keys.A.justPressed() || keys.X.justPressed() || keys.Start.justPressed();
+    const bool back = keys.B.justPressed() || keys.Back.justPressed();
+    if (mReplayDeleteIndex >= 0)
+    {
+        mReplayDeleteEntries.update();
+        if (back) mReplayDeleteIndex = -1;
+        else if (accept)
+        {
+            if (mReplayDeleteEntries.selected().mData == 1)
+            {
+                if (!Game::instance().deleteReplay(mReplays[size_t(mReplayDeleteIndex)].filename))
+                    PlatformFunctions::showMessageBox("Replay", "Could not delete this replay.");
+                mReplays = Game::instance().listReplays();
+                rebuildReplayEntries();
+            }
+            mReplayDeleteIndex = -1;
+        }
+        return;
+    }
+    mReplayEntries.update();
+    const uint32 selected = mReplayEntries.selected().mData;
+    if (back || (accept && selected == BACK))
+    {
+        if (mReplayZone >= 0) { mReplayZone = -1; rebuildReplayEntries(); }
+        else mBrowsingReplays = false;
+        return;
+    }
+    if (selected == BACK) return;
+    if (mReplayZone >= 0 && keys.Y.justPressed())
+    {
+        mReplayDeleteIndex = int(selected);
+        mReplayDeleteEntries.clear();
+        mReplayDeleteEntries.addEntry("Cancel", 0);
+        mReplayDeleteEntries.addEntry("Delete replay", 1);
+        mReplayDeleteEntries.mSelectedEntryIndex = 0;
+    }
+    else if (accept)
+    {
+        if (mReplayZone < 0) { mReplayZone = int(selected); rebuildReplayEntries(); }
+        else
+        {
+            mReplayLaunchFilename = mReplays[selected].filename;
+            GameApp::instance().getGameView().startFadingOut();
+            mState = State::FADE_TO_GAME;
+        }
+    }
+}
+
+void ExtrasMenu::renderReplayBrowser()
+{
+    Drawer& drawer = EngineMain::instance().getDrawer();
+    const int center = mRect.width / 2;
+    drawer.drawRect(Recti(8, 4, mRect.width - 16, mRect.height - 8), Color(0.02f, 0.05f, 0.14f, mVisibility));
+    std::string title = "REPLAYS";
+    if (mReplayZone >= 0)
+    {
+        const auto* zone = SharedDatabase::getZoneByInternalIndex(uint8(mReplayZone));
+        if (zone) title = zone->mShortName + " - Replays";
+    }
+    drawer.printText(global::mOxyfontRegular, Recti(center, 12, 0, 16), title, 5, Color::WHITE);
+    const int rowHeight = mReplayZone < 0 ? 24 : 36;
+    const int visible = std::max(1, (mRect.height - 76) / rowHeight);
+    const int selected = mReplayEntries.mSelectedEntryIndex;
+    const int first = std::max(0, selected - visible + 1);
+    if (mReplayEntries.size() == 1)
+        drawer.printText(global::mOxyfontSmall, Recti(center, 38, 0, 12), "No saved replays", 5, Color::WHITE);
+    for (int row = first; row < std::min(int(mReplayEntries.size()), first + visible); ++row)
+    {
+        const auto& entry = mReplayEntries[size_t(row)];
+        const int y = 53 + (row - first) * rowHeight;
+        const auto color = row == selected ? Color::YELLOW : Color::WHITE;
+        drawer.printText(global::mOxyfontSmall, Recti(center, y, 0, 14), entry.mText, 5, color);
+        if (mReplayZone >= 0 && entry.mData != BACK)
+        {
+            const std::time_t timestamp = std::time_t(mReplays[entry.mData].data.timestamp);
+            char text[40] = {};
+            const auto* time = std::localtime(&timestamp);
+            if (time) std::strftime(text, sizeof(text), "%Y-%m-%d %H:%M:%S", time);
+            drawer.printText(global::mOxyfontTiny, Recti(center, y + 12, 0, 12), text, 5, color);
+        }
+    }
+    drawer.printText(global::mOxyfontTiny, Recti(center, mRect.height - 17, 0, 12),
+        mReplayZone < 0 ? "A: Choose zone   B: Back" : "A: Play   Y: Delete   B: Back", 5, Color::WHITE);
+    if (mReplayDeleteIndex >= 0)
+    {
+        drawer.drawRect(Recti(20, 65, mRect.width - 40, 96), Color(0.05f, 0.05f, 0.1f, 1.0f));
+        drawer.printText(global::mOxyfontRegular, Recti(center, 76, 0, 14), "Delete selected replay?", 5, Color::WHITE);
+        for (size_t i = 0; i < mReplayDeleteEntries.size(); ++i)
+            drawer.printText(global::mOxyfontSmall, Recti(center, 108 + int(i)*22, 0, 12), mReplayDeleteEntries[i].mText,
+                5, int(i) == mReplayDeleteEntries.mSelectedEntryIndex ? Color::YELLOW : Color::WHITE);
+    }
+    drawer.performRendering();
 }

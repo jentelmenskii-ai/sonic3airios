@@ -9,6 +9,7 @@
 #pragma once
 
 #include "sonic3air/menu/GameMenuBase.h"
+#include "sonic3air/Game.h"
 #include "oxygen/drawing/DrawerTexture.h"
 
 class MenuBackground;
@@ -46,6 +47,9 @@ private:
 	void startBlueSphere();
 	void startLevelSelect();
 	void goBack();
+	void rebuildReplayEntries();
+	void updateReplayBrowser();
+	void renderReplayBrowser();
 
 private:
 	MenuBackground* mMenuBackground = nullptr;
@@ -72,6 +76,13 @@ private:
 
 	std::map<uint32, std::vector<std::string_view>> mDescriptionLinesCache;
 
+	bool mBrowsingReplays = false;
+	int mReplayZone = -1;
+	int mReplayDeleteIndex = -1;
+	GameMenuEntries mReplayEntries;
+	GameMenuEntries mReplayDeleteEntries;
+	std::vector<Game::ReplayEntry> mReplays;
+	std::wstring mReplayLaunchFilename;
 	int mAchievementsCompleted = 0;
 	int mRightPressCounter = 0;
 };

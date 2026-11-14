@@ -89,6 +89,7 @@ void PersistentData::loadFromBasePath(const std::wstring& basePath)
 
 void PersistentData::updatePersistentData()
 {
+	if (mTransient) return;
 	// Save files
 	for (uint64 filePathHash : mPendingFileSaves)
 	{
@@ -167,7 +168,7 @@ void PersistentData::removeKey(uint64 filePathHash, uint64 keyHash)
 	{
 		if (file->mEntries.empty())
 		{
-			removeFile(*file);
+			if (!mTransient) removeFile(*file);
 			mPendingFileSaves.erase(filePathHash);
 		}
 		else

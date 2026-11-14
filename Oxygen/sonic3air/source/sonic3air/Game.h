@@ -13,6 +13,8 @@
 #include "sonic3air/data/PlayerProgress.h"
 #include "sonic3air/data/RetroAchievements.h"
 #include "sonic3air/data/PlayerRecorder.h"
+#include "sonic3air/data/ReplayData.h"
+#include "sonic3air/data/GameSettings.h"
 #include "sonic3air/helper/BlueSpheresRendering.h"
 #include "sonic3air/resources/DynamicSprites.h"
 
@@ -44,7 +46,15 @@ public:
 
 	void startup(EmulatorInterface& emulatorInterface);
 	void shutdown();
+	bool setSharedModeSaves(bool enabled);
 	bool setClassicMode(bool enabled);
+	struct ReplayEntry { std::wstring filename; s3air::ReplayData data; };
+	std::vector<ReplayEntry> listReplays();
+	bool playReplay(const std::wstring& filename);
+	bool deleteReplay(const std::wstring& filename);
+	bool finishReplayRecording(bool save);
+	bool isPlayingReplay() const { return mReplayPlaying; }
+	void stopReplay();
 	bool isClassicMode();
 	void update(float timeElapsed);
 
@@ -97,6 +107,9 @@ private:
 	void checkActiveModsUsedFeatures();
 
 	void startIntoGameInternal();
+	void beginReplayRecording();
+	void completeReplayRecording(uint16 zoneAndAct);
+	std::string replayCompatibility() const;
 
 	// Script bindings
 	uint32 useSetting(uint32 settingId);
@@ -134,6 +147,20 @@ private:
 	bool isInSkippableCutscene();
 
 private:
+	s3air::ReplayData mReplay;
+	bool mReplayPlaying = false;
+	bool mReplayRecording = false;
+	bool mReplayStartPending = false;
+	bool mReplayFinishPending = false;
+	bool mReplayPromptPending = false;
+	size_t mReplayFrame = 0;
+	size_t mReplaySettingEvent = 0;
+	std::unordered_map<uint32, uint32> mReplayCurrentSettings;
+	bool mReplayOldClassic = false;
+	bool mReplayOldSpeedrun = false;
+	uint32 mReplayCutsceneFrames = 0;
+	GameSettings* mReplayOldSettings = nullptr;
+	bool mSpeedrunCutsceneActive = false;
 	EmulatorInterface* mEmulatorInterface = nullptr;
 
 	retroachievements::Tracker mRetroAchievements;

@@ -55,10 +55,32 @@ returns to the intro/title screen with 4:3 gameplay (320 × 224 with Genesis-sty
 Select **Anniversary Mode** in the same place to restore widescreen gameplay and
 your original visual preferences. Classic menus share the 320 × 224 field, with their main entries shifted left and original row spacing restored.
 
-Classic progress, time-attack records and save states use **Documents/classic/**.
+By default, Classic progress, time-attack records and save states use **Documents/classic/**.
+In **Options → Gameplay → Play Modes → Save Profile**, choose **Shared (Anniversary)**
+to use Anniversary's existing progress in both editions. Returning to **Separate**
+restores the independent Classic profile. Switching profiles does not merge or overwrite the other profile.
 Anniversary keeps the existing save locations. The selected mode is remembered;
 ROM and mods remain shared. See the [release notes](Oxygen/sonic3air/build/_ios/RELEASE_NOTES.md)
 for the exact locked settings and testing status.
+
+## Speedrun Mode and Replays
+
+Under **Options → Gameplay → Play Modes**, enable **Speedrun Mode** to run marked
+skippable cutscenes automatically at 2× speed, returning to 1× when they end.
+Enable **Replay Mode** before starting Normal Game or Act Select. After each completed
+act, choose **Save Replay** or **Do Not Save** before continuing.
+
+Open **Extras → Replays**, choose a zone, then an act recording. Entries show the act's
+completion time, edition and local date/time. Playback restores the recorded game state,
+random generator, settings and all four players' inputs; it runs the actual game simulation.
+Press Start to pause, then **Exit Game** to return to the main menu. Playback also returns
+to the menu when the recording ends. Replay playback never writes progress or achievements.
+Press **Y** on a recording and confirm **Delete replay** to delete it; Cancel is selected by default.
+
+Replays live in `Documents/replays/` and are shared between editions. Use the same game
+build and enabled mods/settings as the recording; changed script code is rejected.
+Recordings are capped at three hours per act. The iOS build still needs device validation;
+see the [test checklist](docs/REPLAY_TESTING.md).
 
 ## Install mods
 
