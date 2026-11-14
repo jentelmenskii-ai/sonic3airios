@@ -724,7 +724,7 @@ void ExtrasMenu::rebuildReplayEntries()
         {
             const auto& entry = mReplays[i];
             if ((entry.data.zoneAct >> 8) != mReplayZone) continue;
-            const std::string title = "Act " + std::to_string((entry.data.zoneAct & 0xff) + 1) + "  " +
+            const std::string title = (entry.data.scope == s3air::ReplayScope::FULL_ZONE ? std::string("Full Zone") : "Act " + std::to_string((entry.data.zoneAct & 0xff) + 1)) + "  " +
                 TimeAttackData::getTimeString(entry.data.actTime) + (entry.data.classic ? "  Classic" : "  Anniversary");
             mReplayEntries.addEntry(title, uint32(i));
         }
@@ -815,6 +815,13 @@ void ExtrasMenu::renderReplayBrowser()
             const auto* time = std::localtime(&timestamp);
             if (time) std::strftime(text, sizeof(text), "%Y-%m-%d %H:%M:%S", time);
             drawer.printText(global::mOxyfontTiny, Recti(center, y + 12, 0, 12), text, 5, color);
+            const auto& data = mReplays[entry.mData].data;
+            if (data.scope == s3air::ReplayScope::FULL_ZONE)
+            {
+                const auto times = "Act 1: " + TimeAttackData::getTimeString(data.actTimes[0]) +
+                    "   Act 2: " + TimeAttackData::getTimeString(data.actTimes[1]);
+                drawer.printText(global::mOxyfontTiny, Recti(center, y + 23, 0, 10), times, 5, color);
+            }
         }
     }
     drawer.printText(global::mOxyfontTiny, Recti(center, mRect.height - 17, 0, 12),

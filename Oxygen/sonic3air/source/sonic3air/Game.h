@@ -55,6 +55,7 @@ public:
 	bool finishReplayRecording(bool save);
 	bool isPlayingReplay() const { return mReplayPlaying; }
 	void stopReplay();
+	bool prepareReplayForStateLoad();
 	bool isClassicMode();
 	void update(float timeElapsed);
 
@@ -108,7 +109,9 @@ private:
 
 	void startIntoGameInternal();
 	void beginReplayRecording();
-	void completeReplayRecording(uint16 zoneAndAct);
+	void completeReplayRecording(uint16 zoneAndAct, bool leavingZone = false);
+	void captureReplayAction();
+	void applyReplayActions();
 	std::string replayCompatibility() const;
 
 	// Script bindings
@@ -151,6 +154,9 @@ private:
 	bool mReplayPlaying = false;
 	bool mReplayRecording = false;
 	bool mReplayStartPending = false;
+	bool mReplaySnapshotPending = false;
+	size_t mReplayAction = 0;
+	size_t mReplaySnapshotBytes = 0;
 	bool mReplayFinishPending = false;
 	bool mReplayPromptPending = false;
 	size_t mReplayFrame = 0;

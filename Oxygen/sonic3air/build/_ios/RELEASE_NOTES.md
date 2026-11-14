@@ -1,21 +1,22 @@
-# Sonic 3 A.I.R. for iOS · v0.2.5
+# Sonic 3 A.I.R. for iOS · v0.2.6
 
-- **Shared saves:** Options → Gameplay → Play Modes → Save Profile → Shared (Anniversary).
-  Both editions use the Anniversary profile, including unlocks, time-attack records and
-  save states. Separate Classic data is preserved and restored by choosing Separate.
-- **Speedrun Mode:** automatically fast-forwards marked skippable cutscenes at 2×,
-  then returns to 1×. Pause and save prompts remain paused.
-- **Replay Mode:** asks whether to save after each completed Normal Game/Act Select act.
-  Recordings restore the full initial simulation state, RNG, settings, storage snapshot
-  and the exact current/previous input for all four players on every frame.
-- **Extras → Replays:** zone browser, act time, edition and recording date; A to play,
-  Y to delete with confirmation. Playback pauses with Start; Exit Game returns to the
-  main menu. Playback ends at the final recorded frame and cannot award achievements
-  or write save data. Both editions share the replay browser.
-- Recordings validate a versioned checksum and compiled script/mod compatibility.
-  Corrupt or incompatible recordings cannot start. Maximum length is three hours per act.
+- **Replay Recording scope:** Gameplay → Play Modes now offers Each Act, Full Zone,
+  Act 1 Only and Act 2 Only. Full Zone starts in Act 1, records both acts and their
+  transition without an intermediate prompt, then asks to save at the zone end.
+  Single-act zones finish at their exit. The browser labels full-zone recordings.
+- **Complete gameplay timeline:** replays retain restarts and checkpoint restarts,
+  script pause-menu inputs, deaths, bonus stages, manual Y fast-forward and automatic
+  2× cutscenes. Exact running-speed changes are recorded independently from filtered
+  gamepad input. Restarting no longer clears an in-progress recording.
+- **State events:** native restarts, script level starts inside the same recording
+  and external save-state loads are captured at simulation-frame boundaries, with
+  RNG/runtime state and cutscene speed. Recorded Options actions reapply recorded
+  settings without opening interactive Options during playback.
+- **Replay format v2:** bounded state events and per-frame speed/skip metadata.
+  Version 1 files remain readable subject to the original compiled-script/mod checks.
+  Playback remains isolated from disk progress; pause → Exit returns to the menu.
 
-Validation: host C++ syntax checks and profile/storage/replay format tests. Native iOS
-build is checked by GitHub Actions. Real-device playthrough checks remain necessary;
-see `docs/REPLAY_TESTING.md`. The unsigned IPA requires sideloading. Keep Documents
-when upgrading to preserve existing saves and mods.
+Tests cover scope selection, two-act and single-act boundaries, speed transitions,
+state-event serialization, malformed/truncated files and v1 decoding. iOS compilation
+is checked in GitHub Actions. Physical-device gameplay validation is still required;
+see docs/REPLAY_TESTING.md. App version 0.2.6, build 12; unsigned sideloaded IPA.

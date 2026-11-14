@@ -69,6 +69,17 @@ Under **Options → Gameplay → Play Modes**, enable **Speedrun Mode** to run m
 skippable cutscenes automatically at 2× speed, returning to 1× when they end.
 Enable **Replay Mode** before starting Normal Game or Act Select. After each completed
 act, choose **Save Replay** or **Do Not Save** before continuing.
+**Replay Recording** selects **Each Act**, **Full Zone**, **Act 1 Only** or **Act 2 Only**.
+Full Zone starts in Act 1 and keeps both acts and their transition in one recording;
+its save prompt appears after Act 2 (or the exit of a single-act zone). Each Act keeps
+separate recordings. Act 1/2 Only filters recordings to the selected act in each zone.
+
+Replays retain pause-menu inputs, restarts, checkpoint restarts, deaths, bonus stages,
+manual Y fast-forward, automatic cutscene acceleration and gameplay setting changes.
+Native restarts and loaded save states are captured as frame-aligned state events;
+playback uses the original speed changes and continues the original recording through
+restarts. Recorded Options actions reapply their setting changes without requiring
+interactive input during playback.
 
 Open **Extras → Replays**, choose a zone, then an act recording. Entries show the act's
 completion time, edition and local date/time. Playback restores the recorded game state,
@@ -79,7 +90,7 @@ Press **Y** on a recording and confirm **Delete replay** to delete it; Cancel is
 
 Replays live in `Documents/replays/` and are shared between editions. Use the same game
 build and enabled mods/settings as the recording; changed script code is rejected.
-Recordings are capped at three hours per act. The iOS build still needs device validation;
+Recordings are capped at three hours per recording (including both acts in Full Zone mode). The iOS build still needs device validation;
 see the [test checklist](docs/REPLAY_TESTING.md).
 
 ## Install mods

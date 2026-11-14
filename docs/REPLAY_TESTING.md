@@ -34,3 +34,20 @@ The workflow builds an unsigned arm64 IPA for pull requests targeting `ios-nativ
 
 The host environment cannot run Apple's SDK or the game/ROM on an iPhone. Automated
 format/storage tests and a successful IPA compile do not replace these device checks.
+
+## Version 0.2.6: complete gameplay and recording scope
+
+- In each scope, restart the act and checkpoint through script pause, native pause
+  and any enabled restart mod. Verify the earlier attempt remains in the replay
+  and the restart occurs at the same point when played back.
+- Hold/release Y during multiple cutscenes. Compare manual 4×, automatic 2× and
+  return to 1×, including pauses during a cutscene and Options changes. Playback
+  must not wait for an interactive Options screen.
+- Record Full Zone starting at Act 1. Confirm no Act 1 prompt; Act 2 completion
+  gives one prompt and one Full Zone entry. Check both act times and the seamless
+  transition. Repeat for single-act zones and result-free exits.
+- In Act 1 Only/Act 2 Only, complete both acts across two zones. Only the selected
+  act should prompt/save. Each Act must keep the existing two-recording behavior.
+- Load a save state during recording and verify the discontinuity repeats during
+  playback without mutating disk saves. Verify old version 1 replay listings and
+  matching-script playback. Test the bounded state-event failure message.
