@@ -154,7 +154,12 @@ void OptionEntry::applyValue()
 		case OptionEntry::Type::CONFIG_BOOL:
 		{
 			bool* ptr = reinterpret_cast<bool*>(mValuePointer);
-			*ptr = (value != 0);
+			if (ptr == &Configuration::instance().mSharedModeSaves)
+			{
+				Game::instance().setSharedModeSaves(value != 0);
+				loadValue();
+			}
+			else *ptr = (value != 0);
 			break;
 		}
 

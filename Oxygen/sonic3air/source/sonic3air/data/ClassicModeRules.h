@@ -20,9 +20,9 @@ namespace ClassicModeRules
         }
     }
 
-    inline std::wstring saveRoot(const std::wstring& documents, bool classic)
+    inline std::wstring saveRoot(const std::wstring& documents, bool classic, bool shared = false)
     {
-        return documents + (classic ? L"classic/" : L"");
+        return documents + ((classic && !shared) ? L"classic/" : L"");
     }
     inline Vec2i gameSize(bool classic) { return classic ? Vec2i(ClassicScreenLayout::GAME_WIDTH, ClassicScreenLayout::GAME_HEIGHT) : Vec2i(400, 224); }
 }

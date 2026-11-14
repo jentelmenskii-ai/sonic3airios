@@ -55,6 +55,29 @@ int main(int argc, char** argv)
     assert(std::filesystem::is_regular_file(normal + L"storage/s3air_savedata.bin"));
     assert(std::filesystem::is_regular_file(classic + L"storage/s3air_savedata.bin"));
 
+    // Shared mode routes both editions to Anniversary; disabling it restores Classic.
+    for (bool isClassic : {false, true}) {
+        const auto shared = ClassicModeRules::saveRoot(root, isClassic, true);
+        assert(shared == normal);
+        data.loadFromBasePath(shared + L"storage/");
+        assert(data.getData(file, key) == std::vector<uint8>({1,2,3}));
+    }
+    data.loadFromBasePath(ClassicModeRules::saveRoot(root, true, false) + L"storage/");
+    assert(data.getData(file, key) == std::vector<uint8>({7,8,9}));
+    // A replay may read its own writes, including deletion, without persisting them.
+    data.setTransient(true);
+    data.setData("s3air_savedata", "slot1", {42});
+    assert(data.getData(file, key) == std::vector<uint8>({42}));
+    data.updatePersistentData();
+    data.removeKey(file, key);
+    assert(data.getData(file, key).empty());
+    data.updatePersistentData();
+    data.clear();
+    data.setTransient(false);
+    data.loadFromBasePath(classic + L"storage/");
+    assert(data.getData(file, key) == std::vector<uint8>({7,8,9}));
+    data.updatePersistentData();
+
     // Serialize the real achievement map, including imported IDs above 16 bits.
     detail::PlayerAchievementsData anniversaryAchievements, classicAchievements;
     anniversaryAchievements.mAchievementStates[0x0001] = 1; // Existing AIR unlock

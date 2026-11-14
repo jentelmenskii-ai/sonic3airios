@@ -136,6 +136,9 @@ void ConfigurationImpl::serializeSettingsInternal(JsonSerializer& serializer)
 
 	// Selected edition is global; each edition has independent progress.
 	serializer.serialize("ClassicMode", mClassicMode);
+	serializer.serialize("SharedModeSaves", mSharedModeSaves);
+	serializer.serialize("SpeedrunMode", mSpeedrunMode);
+	serializer.serialize("ReplayMode", mReplayMode);
 
 	// Game simulation
 	serializer.serialize("SimulationFrequency", mSimulationFrequency);

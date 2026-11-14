@@ -135,7 +135,7 @@ bool PlayerProgress::load()
 	else
 	{
 		// Classic never migrates Anniversary progress from the shared legacy file.
-		if (Configuration::instance().mClassicMode) return false;
+		if (Configuration::instance().mClassicMode && !Configuration::instance().mSharedModeSaves) return false;
 		// Try to load from old "playerprogress.bin"
 		std::vector<uint8> buffer;
 		if (!FTX::FileSystem->readFile(Configuration::instance().mAppDataPath + L"playerprogress.bin", buffer))

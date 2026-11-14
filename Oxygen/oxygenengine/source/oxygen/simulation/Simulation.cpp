@@ -309,6 +309,13 @@ void Simulation::update(float timeElapsed)
 			const bool result = generateFrame();
 			if (!result)
 				break;
+			// A game callback can pause at an act boundary. Do not execute the
+			// remaining catch-up frames or carry their time into the next update.
+			if (mSimulationSpeed <= 0.0f)
+			{
+				mCurrentTargetFrame = (double)mFrameNumber;
+				break;
+			}
 
 			// Time limit to prevent non-responding application
 			if (SDL_GetTicks() >= limitTime)

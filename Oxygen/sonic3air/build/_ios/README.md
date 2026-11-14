@@ -14,7 +14,9 @@ Download the unsigned IPA from [v0.2.3](https://github.com/jentisalive/sonic3air
 
 Classic Mode uses 320 × 224 gameplay with Genesis-style pixel-aspect correction for 4:3 and a 30 FPS presentation
 cap with 60 Hz logic. Classic menus use the original 224-line layout, shifted inward to fit the 320-pixel field. Its progress,
-time-attack records and save states live in `Documents/classic/`, while Anniversary
+time-attack records and save states live in `Documents/classic/` by default.
+Choose **Options → Gameplay → Play Modes → Save Profile → Shared (Anniversary)**
+to use the Anniversary profile in both modes without deleting the separate Classic profile. Anniversary
 uses the original save locations. Switching modes returns to the intro/title screen.
 The selection is saved across restarts.
 

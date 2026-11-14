@@ -54,6 +54,9 @@ public:
 	int mGamepadVisualStyle = 1;
 #endif
 
+	bool mSpeedrunMode = false;
+	bool mReplayMode = false;
+
 	// Time Attack
 	int mInstantTimeAttackRestart = 0;
 

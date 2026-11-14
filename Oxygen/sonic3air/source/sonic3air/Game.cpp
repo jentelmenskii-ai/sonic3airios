@@ -35,6 +35,10 @@
 #include "oxygen/simulation/CodeExec.h"
 #include "oxygen/simulation/EmulatorInterface.h"
 #include "oxygen/simulation/Simulation.h"
+#include "oxygen/simulation/SaveStateSerializer.h"
+#include "oxygen/simulation/GameRecorder.h"
+#include "oxygen/simulation/LemonScriptProgram.h"
+#include <ctime>
 
 #include <lemon/program/function/FunctionWrapper.h>
 #include <lemon/program/Module.h>
@@ -97,6 +101,7 @@ void Game::startup(EmulatorInterface& emulatorInterface)
 
 void Game::shutdown()
 {
+	stopReplay();
 	mPlayerProgress.save();
 
 	DiscordIntegration::shutdown();
@@ -138,8 +143,14 @@ void Game::update(float timeElapsed)
 		}
 	}
 
+	if (mReplayPromptPending)
+	{
+		mReplayPromptPending = false;
+		GameApp::instance().showReplaySavePrompt();
+	}
 	if (mReturnToMenuTriggered)
 	{
+		stopReplay();
 		Application::instance().getSimulation().setSpeed(0.0f);
 		GameApp::instance().returnToMenu();
 		mReturnToMenuTriggered = false;
@@ -480,6 +491,11 @@ void Game::startIntoMainMenuBG()
 
 void Game::onPreUpdateFrame()
 {
+	if (mReplayStartPending && !mReplayPlaying)
+	{
+		mReplayStartPending = false;
+		beginReplayRecording();
+	}
 }
 
 void Game::onPostUpdateFrame()
@@ -514,6 +530,23 @@ void Game::onPostUpdateFrame()
 		}
 	}
 
+	if (mReplayFinishPending)
+	{
+		mReplayFinishPending = false;
+		mReplayRecording = false;
+		if (mReplayPlaying) returnToMainMenu();
+		else if (!mReplay.frames.empty())
+		{
+			mReplayPromptPending = true;
+			Application::instance().getSimulation().setSpeed(0.0f);
+		}
+	}
+	if (mReplayPlaying && mReplayFrame >= mReplay.frames.size())
+	{
+		returnToMainMenu();
+		Application::instance().getSimulation().setSpeed(0.0f);
+	}
+
 	// Update skippable cutscene
 	if (mSkippableCutsceneFrames > 0)
 	{
@@ -525,7 +558,13 @@ void Game::onPostUpdateFrame()
 		else
 		{
 			Simulation& simulation = Application::instance().getSimulation();
-			if (mButtonYPressedDuringSkippableCutscene)
+			if (simulation.getSpeed() <= 0.0f) {} // Keep pause and replay prompts paused.
+			else if (ConfigurationImpl::instance().mSpeedrunMode)
+			{
+				simulation.setSpeed(2.0f);
+				mSpeedrunCutsceneActive = true;
+			}
+			else if (mButtonYPressedDuringSkippableCutscene)
 			{
 				if (simulation.getSpeed() == 1.0f)
 				{
@@ -535,9 +574,10 @@ void Game::onPostUpdateFrame()
 			}
 			else
 			{
-				if (simulation.getSpeed() == CUTSCENE_SKIPPING_SPEED)
+				if (mSpeedrunCutsceneActive || simulation.getSpeed() == CUTSCENE_SKIPPING_SPEED)
 				{
 					simulation.setSpeed(simulation.getDefaultSpeed());
+					mSpeedrunCutsceneActive = false;
 				}
 				GameApp::instance().showSkippableCutsceneWindow(false);
 			}
@@ -572,6 +612,32 @@ void Game::onPostUpdateFrame()
 
 void Game::onUpdateControls()
 {
+	if (mReplayPlaying)
+	{
+		// Hardware pause remains available even though recorded input owns the gamepads.
+		const auto& keys = InputManager::instance().getController(0);
+		if (keys.Start.justPressed() || keys.Back.justPressed())
+		{
+			GameApp::instance().onGamePaused(false);
+		}
+		while (mReplaySettingEvent < mReplay.events.size() && mReplay.events[mReplaySettingEvent].frame == mReplayFrame)
+		{
+			const auto& event = mReplay.events[mReplaySettingEvent++];
+			if (event.key == 0xffffffff) ConfigurationImpl::instance().mSpeedrunMode = event.value != 0;
+			else ConfigurationImpl::instance().mActiveGameSettings->setValue(event.key, event.value);
+		}
+		if (mReplayFrame < mReplay.frames.size())
+		{
+			for (size_t p = 0; p < ControlsIn::NUM_GAMEPADS; ++p)
+			{
+				auto& pad = ControlsIn::instance().getGamepad(p);
+				pad.mPreviousInput = mReplay.previousInputs[mReplayFrame][p];
+				pad.mCurrentInput = mReplay.frames[mReplayFrame][p];
+			}
+			++mReplayFrame;
+		}
+		return;
+	}
 	if (mSkippableCutsceneFrames > 0 || mButtonYPressedDuringSkippableCutscene)	// Last check makes sure we'll ignore the press until it gets released
 	{
 		// Block input to the game
@@ -580,6 +646,28 @@ void Game::onUpdateControls()
 		{
 			ControlsIn::instance().injectEmptyInputs();
 		}
+	}
+	if (mReplayRecording)
+	{
+		if (mReplay.frames.size() < s3air::ReplayData::MAX_FRAMES)
+		{
+			for (auto& pair : mReplayCurrentSettings)
+			{
+				const uint32 value = pair.first == 0xffffffff ? uint32(ConfigurationImpl::instance().mSpeedrunMode) : getSetting(pair.first, false);
+				if (value != pair.second)
+				{
+					mReplay.events.push_back({uint32(mReplay.frames.size()), pair.first, value});
+					pair.second = value;
+				}
+			}
+			s3air::ReplayData::Input input{};
+			ControlsIn::instance().writeCurrentState(input.data());
+			mReplay.frames.push_back(input);
+			s3air::ReplayData::Input previous{};
+			for (size_t p = 0; p < ControlsIn::NUM_GAMEPADS; ++p) previous[p] = ControlsIn::instance().getGamepad(p).mPreviousInput;
+			mReplay.previousInputs.push_back(previous);
+		}
+		else { mReplayRecording = false; mReplay = {}; }
 	}
 }
 
@@ -862,6 +950,10 @@ void Game::checkActiveModsUsedFeatures()
 
 void Game::startIntoGameInternal()
 {
+	stopReplay();
+	mReplay = {};
+	mReplayRecording = mReplayStartPending = mReplayFinishPending = mReplayPromptPending = false;
+	mSpeedrunCutsceneActive = false;
 	mRetroAchievements = {};
 	// Menus keep their native layout; every game/intro entry chooses a real field size.
 	if (!isInMainMenuMode())
@@ -929,6 +1021,8 @@ bool Game::isAchievementComplete(uint32 achievementId)
 
 void Game::setAchievementComplete(uint32 achievementId)
 {
+	if (mReplayPlaying) return;
+	if (achievementId == SharedDatabase::Achievement::ACHIEVEMENT_LONGPLAY) completeReplayRecording(mReplay.zoneAct);
 	if (achievementId == SharedDatabase::Achievement::ACHIEVEMENT_LONGPLAY)
 		retroEvent(retroachievements::GAME_FINISH, 0, 0);
 	else if (achievementId == SharedDatabase::Achievement::ACHIEVEMENT_SM_JACKPOT)
@@ -965,6 +1059,7 @@ bool Game::isSecretUnlocked(uint32 secretId)
 
 void Game::setSecretUnlocked(uint32 secretId)
 {
+	if (mReplayPlaying) return;
 	SharedDatabase::Secret* secret = SharedDatabase::getSecret(secretId);
 	RMX_CHECK(nullptr != secret, "Secret with ID " << secretId << " not found", return);
 
@@ -984,6 +1079,7 @@ void Game::triggerRestart()
 
 void Game::onGamePause(uint8 canRestart)
 {
+	if (mReplayPlaying) return; // Recorded pauses must not interrupt playback.
 	retroEvent(retroachievements::PAUSE, 0, 0);
 	GameApp::instance().onGamePaused(canRestart != 0);
 }
@@ -996,10 +1092,15 @@ void Game::allowRestartInGamePause(uint8 canRestart)
 void Game::onLevelStart()
 {
 	mRestartingTimeAttack = false;
+	if (!mReplayPlaying && ConfigurationImpl::instance().mReplayMode &&
+		(!mReplayRecording || mEmulatorInterface->readMemory16(0xffffee4e) != mReplay.zoneAct) &&
+		(mMode == Mode::NORMAL_GAME || mMode == Mode::ACT_SELECT)) mReplayStartPending = true;
 }
 
 void Game::onZoneActCompleted(uint16 zoneAndAct)
 {
+	completeReplayRecording(zoneAndAct);
+	if (mReplayPlaying) return;
 	const uint8 bitNumber = (zoneAndAct >> 7) + (zoneAndAct & 1);
 	const uint32 bitValue = (1 << bitNumber);
 	const uint8 character = clamp(mLastCharacters, 1, 3) - 1;
@@ -1018,6 +1119,7 @@ uint16 Game::onTriggerNextZone(uint16 zoneAndAct)
 		retroEvent(retroachievements::ACT_FINISH, 0x0a00, 0);
 	if ((physicalAct == 0x1700 || currentAct == 0x0b01) && (zoneAndAct == 0x0c00 || zoneAndAct == 0x0d01))
 		retroEvent(retroachievements::ACT_FINISH, 0x0b01, 0);
+	completeReplayRecording(currentAct);
 	return zoneAndAct;
 }
 
@@ -1102,8 +1204,9 @@ void Game::endSkippableCutscene()
 
 	// Back to normal
 	Simulation& simulation = Application::instance().getSimulation();
-	if (simulation.getSpeed() == CUTSCENE_SKIPPING_SPEED)
-		simulation.setSpeed(simulation.getDefaultSpeed());
+	if (simulation.getSpeed() > 0.0f && (mSpeedrunCutsceneActive || simulation.getSpeed() == CUTSCENE_SKIPPING_SPEED))
+		simulation.setSpeed(1.0f);
+	mSpeedrunCutsceneActive = false;
 
 	GameApp::instance().showSkippableCutsceneWindow(false);
 }
@@ -1123,7 +1226,7 @@ bool Game::setClassicMode(bool enabled)
 {
     Configuration& config = Configuration::instance();
     if (config.mClassicMode == enabled) return true;
-    const std::wstring root = ClassicModeRules::saveRoot(config.mAppDataPath, enabled);
+    const std::wstring root = ClassicModeRules::saveRoot(config.mAppDataPath, enabled, config.mSharedModeSaves);
     if (!FTX::FileSystem->exists(root + L"storage/") && !FTX::FileSystem->createDirectory(root + L"storage/"))
     {
         PlatformFunctions::showMessageBox("Save profile", "Could not create the save folder. The mode was not changed.");
@@ -1142,11 +1245,11 @@ bool Game::setClassicMode(bool enabled)
 void Game::loadModeProfile()
 {
     Configuration& config = Configuration::instance();
-    const std::wstring root = ClassicModeRules::saveRoot(config.mAppDataPath, config.mClassicMode);
+    const std::wstring root = ClassicModeRules::saveRoot(config.mAppDataPath, config.mClassicMode, config.mSharedModeSaves);
     config.mPersistentDataBasePath = root + L"storage/";
 	RMX_LOG_INFO("Mode profile: " << (config.mClassicMode ? "Classic" : "Anniversary") << "; storage: " << WString(config.mPersistentDataBasePath).toStdString());
-    config.mSaveStatesDir = config.mClassicMode ? root + L"savestates/" : mAnniversarySaveStatesDir;
-    config.mSaveStatesDirLocal = config.mClassicMode ? root + L"savestates/" : mAnniversarySaveStatesDirLocal;
+    config.mSaveStatesDir = (config.mClassicMode && !config.mSharedModeSaves) ? root + L"savestates/" : mAnniversarySaveStatesDir;
+    config.mSaveStatesDirLocal = (config.mClassicMode && !config.mSharedModeSaves) ? root + L"savestates/" : mAnniversarySaveStatesDirLocal;
     PersistentData::instance().loadFromBasePath(config.mPersistentDataBasePath);
     mPlayerProgress.reset();
     mPlayerProgress.load();
@@ -1155,6 +1258,7 @@ void Game::loadModeProfile()
 
 void Game::retroEvent(uint32 event, uint32 a, uint32 b)
 {
+    if (mReplayPlaying) return;
     if (!mEmulatorInterface || event > retroachievements::INVALIDATE) return;
     auto& memory = *mEmulatorInterface;
     if (event == retroachievements::LEVEL_START && memory.readMemory8(0xfffffe48) != 0) return;
@@ -1186,4 +1290,208 @@ void Game::retroEvent(uint32 event, uint32 a, uint32 b)
         s.character = memory.readMemory8(0xffffff8b);
     mRetroAchievements.process(static_cast<retroachievements::Event>(event), s, a, b,
         [this](uint32 id) { setAchievementComplete(id); });
+}
+
+bool Game::setSharedModeSaves(bool enabled)
+{
+    auto& config = Configuration::instance();
+    if (config.mSharedModeSaves == enabled) return true;
+    // Switching a live script's backing storage would mix profiles.
+    if (mMode == Mode::NORMAL_GAME || mMode == Mode::ACT_SELECT || mReplayPlaying) return false;
+    const auto root = ClassicModeRules::saveRoot(config.mAppDataPath, config.mClassicMode, enabled);
+    if (!FTX::FileSystem->exists(root + L"storage/") && !FTX::FileSystem->createDirectory(root + L"storage/"))
+    {
+        PlatformFunctions::showMessageBox("Save profile", "Could not open the save folder. The profile was not changed.");
+        return false;
+    }
+    mPlayerProgress.save(true);
+    PersistentData::instance().updatePersistentData();
+    config.mSharedModeSaves = enabled;
+    loadModeProfile();
+    config.saveSettings();
+    return true;
+}
+
+std::string Game::replayCompatibility() const
+{
+    std::string result = "S3AIR-iOS-0.2.5-replay1:";
+    result += EngineMain::getDelegate().getAppMetaData().mBuildVersionString;
+    for (const auto* module : Application::instance().getSimulation().getCodeExec().getLemonScriptProgram().getModules())
+        result += ":" + std::to_string(module->getCompiledCodeHash());
+    for (const Mod* mod : ModManager::instance().getActiveMods())
+    {
+        result += "\n" + mod->mUniqueID + ":" + mod->mDirectoryName + ":" + mod->mModVersion;
+        for (const auto& category : mod->mSettingCategories)
+            for (const auto& setting : category.mSettings)
+                result += "\n" + setting.mIdentifier + "=" + std::to_string(setting.mCurrentValue);
+    }
+    return result;
+}
+
+void Game::beginReplayRecording()
+{
+    if (!ConfigurationImpl::instance().mReplayMode || (mMode != Mode::NORMAL_GAME && mMode != Mode::ACT_SELECT)) return;
+    mReplay = {};
+    mReplay.zoneAct = mEmulatorInterface->readMemory16(0xffffee4e);
+    if (!SharedDatabase::getZoneByInternalIndex(mReplay.zoneAct >> 8)) return;
+    mReplay.classic = Configuration::instance().mClassicMode;
+    mReplay.speedrun = ConfigurationImpl::instance().mSpeedrunMode;
+    mReplay.normalGame = isInNormalGameMode();
+    mReplay.frequency = uint32(Application::instance().getSimulation().getSimulationFrequency());
+    mReplay.cutsceneFrames = mSkippableCutsceneFrames;
+    mReplay.timestamp = uint64(std::time(nullptr));
+    mReplay.compatibility = replayCompatibility();
+    ControlsIn::instance().writeCurrentState(mReplay.initialInput.data());
+    mReplayCurrentSettings.clear();
+    for (const auto& pair : SharedDatabase::getSettings())
+    {
+        const uint32 value = getSetting(pair.first, false);
+        mReplay.settings.emplace_back(pair.first, value);
+        mReplayCurrentSettings[pair.first] = value;
+    }
+    mReplayCurrentSettings[0xffffffff] = uint32(mReplay.speedrun);
+    for (const auto& pair : PersistentData::instance().getFiles())
+        for (const auto& entry : pair.second.mEntries)
+            mReplay.persistent.push_back({pair.second.mFilePath, entry.mKey, entry.mData});
+    SaveStateSerializer serializer(Application::instance().getSimulation(), RenderParts::instance());
+    mReplayRecording = serializer.saveState(mReplay.state);
+}
+
+void Game::completeReplayRecording(uint16 zoneAndAct)
+{
+    if (mReplayPlaying) return; // Playback ends at its recorded frame count, including the final frame.
+    if (!mReplayRecording || mReplayFinishPending || zoneAndAct != mReplay.zoneAct) return;
+    mReplay.actTime = (mEmulatorInterface->readMemory8(0xfffffe23) * 60 +
+        mEmulatorInterface->readMemory8(0xfffffe24)) * 60 + mEmulatorInterface->readMemory8(0xfffffe25);
+    mReplayFinishPending = true;
+}
+
+bool Game::finishReplayRecording(bool save)
+{
+    if (save)
+    {
+        const auto directory = Configuration::instance().mAppDataPath + L"replays/";
+        const auto bytes = mReplay.encode();
+        if (bytes.empty() || (!FTX::FileSystem->exists(directory) && !FTX::FileSystem->createDirectory(directory))) return false;
+        std::wstring filename;
+        for (uint32 index = 1; ; ++index)
+        {
+            filename = std::to_wstring(mReplay.timestamp) + L"_" + std::to_wstring(index);
+            if (!FTX::FileSystem->exists(directory + filename + L".s3rp")) break;
+        }
+        // A temporary file is never listed; a failed save leaves the prompt open for retry.
+        if (!FTX::FileSystem->saveFile(directory + filename + L".tmp", bytes) ||
+            !FTX::FileSystem->renameFile(directory + filename + L".tmp", directory + filename + L".s3rp"))
+        {
+            PlatformFunctions::showMessageBox("Replay", "Could not save the replay. Try again or choose Do Not Save.");
+            return false;
+        }
+    }
+    mReplay = {};
+    return true;
+}
+
+std::vector<Game::ReplayEntry> Game::listReplays()
+{
+    std::vector<ReplayEntry> result;
+    std::vector<rmx::FileIO::FileEntry> files;
+    FTX::FileSystem->listFilesByMask(Configuration::instance().mAppDataPath + L"replays/*.s3rp", false, files);
+    for (const auto& file : files)
+    {
+        if (file.mSize > s3air::ReplayData::MAX_BYTES) continue;
+        std::vector<uint8> bytes;
+        ReplayEntry entry;
+        entry.filename = file.mPath + file.mFilename;
+        if (FTX::FileSystem->readFile(entry.filename, bytes) && s3air::ReplayData::decode(bytes, entry.data))
+        {
+            // The browser needs only metadata, not all recordings resident in memory.
+            entry.data.frames.clear(); entry.data.previousInputs.clear(); entry.data.state.clear(); entry.data.persistent.clear(); entry.data.settings.clear(); entry.data.events.clear();
+            result.push_back(std::move(entry));
+        }
+    }
+    std::sort(result.begin(), result.end(), [](const ReplayEntry& a, const ReplayEntry& b) {
+        return a.data.zoneAct != b.data.zoneAct ? a.data.zoneAct < b.data.zoneAct : a.data.timestamp > b.data.timestamp;
+    });
+    return result;
+}
+
+bool Game::deleteReplay(const std::wstring& filename)
+{
+    // Only files returned by the replay browser are accepted.
+    const auto entries = listReplays();
+    for (const auto& entry : entries) if (entry.filename == filename) return FTX::FileSystem->removeFile(filename);
+    return false;
+}
+
+bool Game::playReplay(const std::wstring& filename)
+{
+    bool found = false;
+    for (const auto& entry : listReplays()) if (entry.filename == filename) { found = true; break; }
+    if (!found) return false;
+    s3air::ReplayData replay;
+    std::vector<uint8> bytes;
+    if (!FTX::FileSystem->readFile(filename, bytes) || !s3air::ReplayData::decode(bytes, replay) ||
+        replay.compatibility != replayCompatibility())
+    {
+        PlatformFunctions::showMessageBox("Replay", "This replay is damaged or needs the original game version and mods.");
+        return false;
+    }
+    stopReplay();
+    auto& config = ConfigurationImpl::instance();
+    mPlayerProgress.save(true);
+    PersistentData::instance().updatePersistentData();
+    mMode = replay.normalGame ? Mode::NORMAL_GAME : Mode::ACT_SELECT;
+    startIntoGameInternal();
+    mReplay = std::move(replay);
+    mReplayOldClassic = config.mClassicMode;
+    mReplayOldSpeedrun = config.mSpeedrunMode;
+    mReplayOldSettings = config.mActiveGameSettings;
+    config.mClassicMode = mReplay.classic;
+    config.mSpeedrunMode = mReplay.speedrun;
+    config.mActiveGameSettings = &config.mAlternativeGameSettings;
+    for (const auto& setting : mReplay.settings) config.mActiveGameSettings->setValue(setting.first, setting.second);
+    auto& persistent = PersistentData::instance();
+    persistent.setTransient(true);
+    persistent.clear();
+    for (const auto& entry : mReplay.persistent) persistent.setData(entry.file, entry.key, entry.bytes);
+    mReplayPlaying = true;
+    mPlayerProgress.reset(); mPlayerProgress.load();
+    mReplayFrame = 0;
+    mReplaySettingEvent = 0;
+    mSkippableCutsceneFrames = mReplay.cutsceneFrames;
+    auto& simulation = Application::instance().getSimulation();
+    VideoOut::instance().reset();
+    AudioOut::instance().reset();
+    SaveStateSerializer serializer(simulation, RenderParts::instance());
+    if (!serializer.loadState(mReplay.state))
+    {
+        stopReplay();
+        PlatformFunctions::showMessageBox("Replay", "The recorded game state could not be loaded.");
+        return false;
+    }
+    simulation.getGameRecorder().clear();
+    simulation.getCodeExec().reinitRuntime(nullptr, CodeExec::CallStackInitPolicy::USE_EXISTING);
+    simulation.setSimulationFrequencyOverride(float(mReplay.frequency));
+    simulation.setSpeed(1.0f);
+    VideoOut::instance().setScreenSize(ClassicModeRules::gameSize(config.mClassicMode));
+    ControlsIn::instance().setAllIgnores();
+    return true;
+}
+
+void Game::stopReplay()
+{
+    if (!mReplayPlaying) return;
+    mReplayPlaying = false;
+    auto& config = ConfigurationImpl::instance();
+    config.mClassicMode = mReplayOldClassic;
+    config.mSpeedrunMode = mReplayOldSpeedrun;
+    config.mActiveGameSettings = mReplayOldSettings;
+    auto& persistent = PersistentData::instance();
+    persistent.clear();
+    persistent.setTransient(false);
+    persistent.loadFromBasePath(config.mPersistentDataBasePath);
+    mPlayerProgress.reset(); mPlayerProgress.load();
+    mReplay = {};
+    endSkippableCutscene();
+    Application::instance().getSimulation().disableSimulationFrequencyOverride();
 }

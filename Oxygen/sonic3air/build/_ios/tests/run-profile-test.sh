@@ -47,3 +47,8 @@ python3 "$repo_root/Oxygen/sonic3air/build/_ios/tests/compact_menu_test.py" "$re
   "$repo_root/Oxygen/sonic3air/build/_ios/tests/retro_achievements_test.cpp" \
   -o "$test_build_dir/retro_achievements_test"
 "$test_build_dir/retro_achievements_test"
+
+"${CXX:-c++}" -std=c++17 -I "$repo_root/Oxygen/sonic3air/source" \
+  "$repo_root/Oxygen/sonic3air/build/_ios/tests/replay_data_test.cpp" \
+  -o "$test_build_dir/replay_data_test"
+"$test_build_dir/replay_data_test"
