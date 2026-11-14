@@ -139,6 +139,8 @@ void ConfigurationImpl::serializeSettingsInternal(JsonSerializer& serializer)
 	serializer.serialize("SharedModeSaves", mSharedModeSaves);
 	serializer.serialize("SpeedrunMode", mSpeedrunMode);
 	serializer.serialize("ReplayMode", mReplayMode);
+	serializer.serialize("ReplayScope", mReplayScope);
+	mReplayScope = clamp(mReplayScope, 0, 3);
 
 	// Game simulation
 	serializer.serialize("SimulationFrequency", mSimulationFrequency);

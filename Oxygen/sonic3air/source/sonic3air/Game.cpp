@@ -157,7 +157,19 @@ void Game::update(float timeElapsed)
 	}
 	else if (mRestartTriggered)
 	{
+		// A runtime restart must not discard the attempt already recorded.
+		const bool recording = mReplayRecording;
+		const size_t snapshotBytes = mReplaySnapshotBytes;
+		auto replay = recording ? std::move(mReplay) : s3air::ReplayData();
 		startIntoLevel(mMode, mSubMode, mLastZoneAndAct, mLastCharacters);
+		if (recording)
+		{
+			mReplay = std::move(replay);
+			mReplaySnapshotBytes = snapshotBytes;
+			mReplayRecording = true;
+			mReplaySnapshotPending = true;
+			mReplayStartPending = false;
+		}
 		mRestartTriggered = false;
 	}
 }
@@ -420,6 +432,7 @@ void Game::restartLevel()
 {
 	Simulation& simulation = Application::instance().getSimulation();
 	simulation.getCodeExec().getLemonScriptRuntime().callFunctionByName("restartLevel");
+	if (mReplayRecording) mReplaySnapshotPending = true;
 	simulation.setSpeed(simulation.getDefaultSpeed());		// Because it could be paused
 }
 
@@ -427,6 +440,7 @@ void Game::restartAtCheckpoint()
 {
 	Simulation& simulation = Application::instance().getSimulation();
 	simulation.getCodeExec().getLemonScriptRuntime().callFunctionByName("restartAtCheckpoint");
+	if (mReplayRecording) mReplaySnapshotPending = true;
 	simulation.setSpeed(simulation.getDefaultSpeed());		// Because it could be paused
 }
 
@@ -491,15 +505,18 @@ void Game::startIntoMainMenuBG()
 
 void Game::onPreUpdateFrame()
 {
+	if (mReplayPlaying) { applyReplayActions(); return; }
 	if (mReplayStartPending && !mReplayPlaying)
 	{
 		mReplayStartPending = false;
 		beginReplayRecording();
 	}
+	if (mReplaySnapshotPending && mReplayRecording) captureReplayAction();
 }
 
 void Game::onPostUpdateFrame()
 {
+	const bool recordedFrame = mReplayRecording;
 	EmulatorInterface& emulatorInterface = *mEmulatorInterface;
 
 	// If code execution stopped, return to the main menu
@@ -608,6 +625,11 @@ void Game::onPostUpdateFrame()
 			GameApp::instance().showTimeAttackResults(hundreds, otherTimes);
 		}
 	}
+	Simulation& replaySimulation = Application::instance().getSimulation();
+	if (recordedFrame && !mReplay.controls.empty())
+		mReplay.controls.back().speedMilli = s3air::replaySpeedMilli(replaySimulation.getSpeed(), mReplay.controls.back().speedMilli);
+	if (mReplayPlaying && mReplay.formatVersion >= 2 && mReplayFrame > 0 && replaySimulation.getSpeed() > 0.0f)
+		replaySimulation.setSpeed(float(mReplay.controls[mReplayFrame - 1].speedMilli) / 1000.0f);
 }
 
 void Game::onUpdateControls()
@@ -634,10 +656,12 @@ void Game::onUpdateControls()
 				pad.mPreviousInput = mReplay.previousInputs[mReplayFrame][p];
 				pad.mCurrentInput = mReplay.frames[mReplayFrame][p];
 			}
+			mButtonYPressedDuringSkippableCutscene = mReplay.controls[mReplayFrame].manualSkip;
 			++mReplayFrame;
 		}
 		return;
 	}
+	const bool rawSkip = ControlsIn::instance().getGamepad(0).isPressed(ControlsIn::Button::Y);
 	if (mSkippableCutsceneFrames > 0 || mButtonYPressedDuringSkippableCutscene)	// Last check makes sure we'll ignore the press until it gets released
 	{
 		// Block input to the game
@@ -666,6 +690,7 @@ void Game::onUpdateControls()
 			s3air::ReplayData::Input previous{};
 			for (size_t p = 0; p < ControlsIn::NUM_GAMEPADS; ++p) previous[p] = ControlsIn::instance().getGamepad(p).mPreviousInput;
 			mReplay.previousInputs.push_back(previous);
+			mReplay.controls.push_back({s3air::replaySpeedMilli(Application::instance().getSimulation().getSpeed()), rawSkip && mSkippableCutsceneFrames > 0});
 		}
 		else { mReplayRecording = false; mReplay = {}; }
 	}
@@ -953,6 +978,8 @@ void Game::startIntoGameInternal()
 	stopReplay();
 	mReplay = {};
 	mReplayRecording = mReplayStartPending = mReplayFinishPending = mReplayPromptPending = false;
+	mReplaySnapshotPending = false;
+	mReplayAction = mReplaySnapshotBytes = 0;
 	mSpeedrunCutsceneActive = false;
 	mRetroAchievements = {};
 	// Menus keep their native layout; every game/intro entry chooses a real field size.
@@ -1022,7 +1049,7 @@ bool Game::isAchievementComplete(uint32 achievementId)
 void Game::setAchievementComplete(uint32 achievementId)
 {
 	if (mReplayPlaying) return;
-	if (achievementId == SharedDatabase::Achievement::ACHIEVEMENT_LONGPLAY) completeReplayRecording(mReplay.zoneAct);
+	if (achievementId == SharedDatabase::Achievement::ACHIEVEMENT_LONGPLAY) completeReplayRecording(mEmulatorInterface->readMemory16(0xffffee4e), true);
 	if (achievementId == SharedDatabase::Achievement::ACHIEVEMENT_LONGPLAY)
 		retroEvent(retroachievements::GAME_FINISH, 0, 0);
 	else if (achievementId == SharedDatabase::Achievement::ACHIEVEMENT_SM_JACKPOT)
@@ -1074,6 +1101,7 @@ void Game::setSecretUnlocked(uint32 secretId)
 
 void Game::triggerRestart()
 {
+	if (mReplayPlaying) return; // The recorded state event performs this restart at its original frame.
 	mRestartTriggered = true;
 }
 
@@ -1092,9 +1120,18 @@ void Game::allowRestartInGamePause(uint8 canRestart)
 void Game::onLevelStart()
 {
 	mRestartingTimeAttack = false;
-	if (!mReplayPlaying && ConfigurationImpl::instance().mReplayMode &&
-		(!mReplayRecording || mEmulatorInterface->readMemory16(0xffffee4e) != mReplay.zoneAct) &&
-		(mMode == Mode::NORMAL_GAME || mMode == Mode::ACT_SELECT)) mReplayStartPending = true;
+	if (mReplayPlaying || !ConfigurationImpl::instance().mReplayMode ||
+		(mMode != Mode::NORMAL_GAME && mMode != Mode::ACT_SELECT) || mEmulatorInterface->readMemory8(0xfffffe48) != 0) return;
+	const uint16 act = mEmulatorInterface->readMemory16(0xffffee4e);
+	// Preserve restarts and the Act 1 -> Act 2 transition inside a full-zone recording.
+	if (mReplayRecording && (act == mReplay.zoneAct ||
+		(mReplay.scope == s3air::ReplayScope::FULL_ZONE && (act >> 8) == (mReplay.zoneAct >> 8))))
+	{
+		// Script restarts and seamless transitions are captured after this frame.
+		mReplaySnapshotPending = true;
+		return;
+	}
+	mReplayStartPending = s3air::replayShouldStart(s3air::ReplayScope(ConfigurationImpl::instance().mReplayScope), act);
 }
 
 void Game::onZoneActCompleted(uint16 zoneAndAct)
@@ -1119,7 +1156,7 @@ uint16 Game::onTriggerNextZone(uint16 zoneAndAct)
 		retroEvent(retroachievements::ACT_FINISH, 0x0a00, 0);
 	if ((physicalAct == 0x1700 || currentAct == 0x0b01) && (zoneAndAct == 0x0c00 || zoneAndAct == 0x0d01))
 		retroEvent(retroachievements::ACT_FINISH, 0x0b01, 0);
-	completeReplayRecording(currentAct);
+	completeReplayRecording(currentAct, (currentAct >> 8) != (zoneAndAct >> 8));
 	return zoneAndAct;
 }
 
@@ -1165,6 +1202,7 @@ void Game::returnToMainMenu()
 
 void Game::openOptionsMenu()
 {
+	if (mReplayPlaying) return; // Reapply recorded setting events instead of opening interactive UI.
 	GameApp::instance().openOptionsMenuInGame();
 }
 
@@ -1332,7 +1370,12 @@ void Game::beginReplayRecording()
 {
     if (!ConfigurationImpl::instance().mReplayMode || (mMode != Mode::NORMAL_GAME && mMode != Mode::ACT_SELECT)) return;
     mReplay = {};
+    mReplay.scope = s3air::ReplayScope(ConfigurationImpl::instance().mReplayScope);
     mReplay.zoneAct = mEmulatorInterface->readMemory16(0xffffee4e);
+    if (!s3air::replayShouldStart(mReplay.scope, mReplay.zoneAct)) return;
+    mReplay.initialSpeedMilli = s3air::replaySpeedMilli(Application::instance().getSimulation().getSpeed());
+    mReplaySnapshotBytes = 0;
+    mReplaySnapshotPending = false;
     if (!SharedDatabase::getZoneByInternalIndex(mReplay.zoneAct >> 8)) return;
     mReplay.classic = Configuration::instance().mClassicMode;
     mReplay.speedrun = ConfigurationImpl::instance().mSpeedrunMode;
@@ -1357,13 +1400,17 @@ void Game::beginReplayRecording()
     mReplayRecording = serializer.saveState(mReplay.state);
 }
 
-void Game::completeReplayRecording(uint16 zoneAndAct)
+void Game::completeReplayRecording(uint16 zoneAndAct, bool leavingZone)
 {
-    if (mReplayPlaying) return; // Playback ends at its recorded frame count, including the final frame.
-    if (!mReplayRecording || mReplayFinishPending || zoneAndAct != mReplay.zoneAct) return;
-    mReplay.actTime = (mEmulatorInterface->readMemory8(0xfffffe23) * 60 +
+    if (mReplayPlaying || !mReplayRecording || mReplayFinishPending ||
+        (zoneAndAct >> 8) != (mReplay.zoneAct >> 8) || (zoneAndAct & 0xff) > 1) return;
+    const auto* zone = SharedDatabase::getZoneByInternalIndex(zoneAndAct >> 8);
+    const uint32 time = (mEmulatorInterface->readMemory8(0xfffffe23) * 60 +
         mEmulatorInterface->readMemory8(0xfffffe24)) * 60 + mEmulatorInterface->readMemory8(0xfffffe25);
-    mReplayFinishPending = true;
+    mReplay.actTimes[zoneAndAct & 1] = time;
+    mReplay.actTime = mReplay.scope == s3air::ReplayScope::FULL_ZONE ? mReplay.actTimes[0] + mReplay.actTimes[1] : time;
+    mReplayFinishPending = s3air::replayShouldFinish(mReplay.scope, mReplay.zoneAct, zoneAndAct,
+        zone ? zone->mActsNormal : 2, leavingZone);
 }
 
 bool Game::finishReplayRecording(bool save)
@@ -1405,7 +1452,7 @@ std::vector<Game::ReplayEntry> Game::listReplays()
         if (FTX::FileSystem->readFile(entry.filename, bytes) && s3air::ReplayData::decode(bytes, entry.data))
         {
             // The browser needs only metadata, not all recordings resident in memory.
-            entry.data.frames.clear(); entry.data.previousInputs.clear(); entry.data.state.clear(); entry.data.persistent.clear(); entry.data.settings.clear(); entry.data.events.clear();
+            entry.data.frames.clear(); entry.data.previousInputs.clear(); entry.data.state.clear(); entry.data.persistent.clear(); entry.data.settings.clear(); entry.data.events.clear(); entry.data.controls.clear(); entry.data.actions.clear();
             result.push_back(std::move(entry));
         }
     }
@@ -1458,6 +1505,7 @@ bool Game::playReplay(const std::wstring& filename)
     mPlayerProgress.reset(); mPlayerProgress.load();
     mReplayFrame = 0;
     mReplaySettingEvent = 0;
+    mReplayAction = 0;
     mSkippableCutsceneFrames = mReplay.cutsceneFrames;
     auto& simulation = Application::instance().getSimulation();
     VideoOut::instance().reset();
@@ -1472,7 +1520,7 @@ bool Game::playReplay(const std::wstring& filename)
     simulation.getGameRecorder().clear();
     simulation.getCodeExec().reinitRuntime(nullptr, CodeExec::CallStackInitPolicy::USE_EXISTING);
     simulation.setSimulationFrequencyOverride(float(mReplay.frequency));
-    simulation.setSpeed(1.0f);
+    simulation.setSpeed(float(mReplay.initialSpeedMilli) / 1000.0f);
     VideoOut::instance().setScreenSize(ClassicModeRules::gameSize(config.mClassicMode));
     ControlsIn::instance().setAllIgnores();
     return true;
@@ -1494,4 +1542,56 @@ void Game::stopReplay()
     mReplay = {};
     endSkippableCutscene();
     Application::instance().getSimulation().disableSimulationFrequencyOverride();
+}
+
+bool Game::prepareReplayForStateLoad()
+{
+    if (mReplayPlaying) stopReplay();
+    if (!mReplayRecording) return false;
+    mReplaySnapshotPending = true;
+    return true;
+}
+
+void Game::captureReplayAction()
+{
+    mReplaySnapshotPending = false;
+    s3air::ReplayData::StateEvent action;
+    action.frame = uint32(mReplay.frames.size());
+    action.cutsceneFrames = mSkippableCutsceneFrames;
+    action.manualSkip = mButtonYPressedDuringSkippableCutscene;
+    action.speedMilli = s3air::replaySpeedMilli(Application::instance().getSimulation().getSpeed());
+    SaveStateSerializer serializer(Application::instance().getSimulation(), RenderParts::instance());
+    if (!serializer.saveState(action.state) || mReplay.actions.size() >= 256 ||
+        action.state.size() + mReplaySnapshotBytes + mReplay.state.size() > 40 * 1024 * 1024)
+    {
+        mReplayRecording = false;
+        mReplay = {};
+        PlatformFunctions::showMessageBox("Replay", "Recording stopped: the replay state limit was reached or a state could not be captured.");
+        return;
+    }
+    mReplaySnapshotBytes += action.state.size();
+    mReplay.actions.push_back(std::move(action));
+}
+
+void Game::applyReplayActions()
+{
+    while (mReplayAction < mReplay.actions.size() && mReplay.actions[mReplayAction].frame == mReplayFrame)
+    {
+        const auto& action = mReplay.actions[mReplayAction++];
+        auto& simulation = Application::instance().getSimulation();
+        VideoOut::instance().reset();
+        AudioOut::instance().reset();
+        SaveStateSerializer serializer(simulation, RenderParts::instance());
+        if (!serializer.loadState(action.state))
+        {
+            returnToMainMenu();
+            simulation.setSpeed(0.0f);
+            return;
+        }
+        simulation.getCodeExec().reinitRuntime(nullptr, CodeExec::CallStackInitPolicy::USE_EXISTING);
+        mSkippableCutsceneFrames = action.cutsceneFrames;
+        mButtonYPressedDuringSkippableCutscene = action.manualSkip;
+        mSpeedrunCutsceneActive = false;
+        simulation.setSpeed(float(action.speedMilli) / 1000.0f);
+    }
 }

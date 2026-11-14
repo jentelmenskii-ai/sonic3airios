@@ -72,6 +72,7 @@ namespace
 
 		ConditionalOption(option::SHARED_MODE_SAVES, true),
 		ConditionalOption(option::REPLAY_MODE, true),
+		ConditionalOption(option::REPLAY_SCOPE, true),
 		ConditionalOption(option::LEVEL_LAYOUTS,			 true),
 		ConditionalOption(option::AIZ_BLIMPSEQUENCE,		 true),
 		ConditionalOption(option::LBZ_BIGARMS,				 true),
@@ -109,6 +110,7 @@ OptionsMenu::OptionsMenu(MenuBackground& menuBackground) :
 		setupOptionEntryBool(option::SHARED_MODE_SAVES, &config.mSharedModeSaves);
 		setupOptionEntryBool(option::SPEEDRUN_MODE, &config.mSpeedrunMode);
 		setupOptionEntryBool(option::REPLAY_MODE, &config.mReplayMode);
+		setupOptionEntryInt(option::REPLAY_SCOPE, &config.mReplayScope);
 		setupOptionEntryInt(option::RELEASE_CHANNEL,			&config.mGameServerImpl.mUpdateCheck.mReleaseChannel);
 
 		setupOptionEntryEnum8(option::FRAME_SYNC,				&config.mFrameSync);
