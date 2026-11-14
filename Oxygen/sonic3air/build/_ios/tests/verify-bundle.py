@@ -1,5 +1,6 @@
 """Check the actual IPA payload before publishing it; no ROM is needed."""
 import plistlib
+import re
 import struct
 import sys
 from pathlib import Path
@@ -7,7 +8,14 @@ from pathlib import Path
 app = Path(sys.argv[1])
 with (app / "Info.plist").open("rb") as stream:
     info = plistlib.load(stream)
-assert info["CFBundleShortVersionString"] == "0.2.4"
+cmake = (Path(__file__).resolve().parents[1] / "CMakeLists.txt").read_text()
+for plist_key, cmake_key in [
+    ("CFBundleShortVersionString", "MACOSX_BUNDLE_SHORT_VERSION_STRING"),
+    ("CFBundleVersion", "MACOSX_BUNDLE_BUNDLE_VERSION"),
+]:
+    expected = re.search(rf'{cmake_key}\s+"([^"\n]+)"', cmake)
+    assert expected, f"Missing {cmake_key} in CMakeLists.txt"
+    assert info[plist_key] == expected.group(1), f"{plist_key}: {info[plist_key]} != {expected.group(1)}"
 assert info["UIDeviceFamily"] == [1, 2]
 assert info["CFBundleSupportedPlatforms"] == ["iPhoneOS"]
 assert info["CFBundleIcons"]["CFBundlePrimaryIcon"]["CFBundleIconFiles"]
