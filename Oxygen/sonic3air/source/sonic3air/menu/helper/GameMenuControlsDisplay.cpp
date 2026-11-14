@@ -44,10 +44,11 @@ void GameMenuControlsDisplay::addControl(std::string_view displayText, bool alig
 
 void GameMenuControlsDisplay::render(Drawer& drawer, float visibility)
 {
+	const int width = Configuration::instance().mClassicMode ? 320 : 400;
 	Vec2i pos(0, 216 + roundToInt((1.0f - visibility) * 16));
 
 	// Background
-	drawer.drawRect(Recti(pos.x, pos.y - 1, 400, 225 - pos.y), Color(0.0f, 0.0f, 0.0f));
+	drawer.drawRect(Recti(pos.x, pos.y - 1, width, 225 - pos.y), Color(0.0f, 0.0f, 0.0f));
 	//	for (int k = 0; k < 6; ++k)
 	//		drawer.drawRect(Recti(pos.x, pos.y - 7 + k, 400, 1), Color(0.0f, 0.0f, 0.0f, 0.1f * k - 0.05f));
 
@@ -62,7 +63,7 @@ void GameMenuControlsDisplay::render(Drawer& drawer, float visibility)
 	}
 
 	// Right-aligned entries (in reverse order)
-	pos.x = 400 - 8;
+	pos.x = width - 8;
 	for (auto it = mControls.crbegin(); it != mControls.crend(); ++it)
 	{
 		const Control& control = *it;

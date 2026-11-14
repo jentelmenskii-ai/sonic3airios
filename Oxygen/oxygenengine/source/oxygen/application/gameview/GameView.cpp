@@ -17,6 +17,8 @@
 #include "oxygen/drawing/upscaler/UpscalerCollection.h"
 #include "oxygen/engine/EngineMain.h"
 #include "oxygen/helper/FileHelper.h"
+#include "oxygen/helper/ClassicScreenLayout.h"
+#include "oxygen/rendering/utils/RenderUtils.h"
 #include "oxygen/helper/HighResolutionTimer.h"
 #include "oxygen/helper/Logging.h"
 #include "oxygen/helper/Profiling.h"
@@ -96,7 +98,14 @@ void GameView::updateGameViewport()
 {
 	const Configuration& config = Configuration::instance();
 	const Recti gameScreenRect = VideoOut::instance().getScreenRect();
-	mGameViewport.setResolution(gameScreenRect.getSize());
+	mGameViewport.setResolution(ClassicScreenLayout::compositionSize(config.mClassicMode, gameScreenRect.getSize(), config.mClassicMenuActive));
+
+	if (config.mClassicMode)
+	{
+		// The game and compact native menus share the original 320x224 field.
+		mGameViewport.setRectOnScreen(RenderUtils::getLetterBoxRect(mRect, 4.0f / 3.0f));
+		return;
+	}
 
 	switch (config.mUpscaling)
 	{
@@ -576,7 +585,8 @@ void GameView::render()
 	VideoOut& videoOut = VideoOut::instance();
 	const Recti gameScreenRect = VideoOut::instance().getScreenRect();
 	mGameViewport.setResolution(gameScreenRect.getSize());
-	mFinalGameTexture.setupAsRenderTarget(gameScreenRect.getSize());
+	const Recti compositionRect(Vec2i(), ClassicScreenLayout::compositionSize(config.mClassicMode, gameScreenRect.getSize(), config.mClassicMenuActive));
+	mFinalGameTexture.setupAsRenderTarget(compositionRect.getSize());
 
 	// Refresh simulation output image
 	if (mStillImage.mMode != StillImageMode::NONE)
@@ -600,7 +610,7 @@ void GameView::render()
 
 	for (GuiBase* child : getChildren())
 	{
-		child->setRect(gameScreenRect);
+		child->setRect(compositionRect);
 	}
 
 	if (mDebugVisualizations.mDebugOutput >= 0)
@@ -621,17 +631,20 @@ void GameView::render()
 	}
 
 	// Here goes the real rendering
-	drawer.setRenderTarget(mFinalGameTexture, gameScreenRect);
+	drawer.setRenderTarget(mFinalGameTexture, compositionRect);
 	drawer.setBlendMode(BlendMode::OPAQUE);
+
+	const Recti backgroundRect = ClassicScreenLayout::isMenu(config.mClassicMode, gameScreenRect.getSize(), config.mClassicMenuActive)
+		? RenderUtils::getScaleToFillRect(compositionRect, (float)gameScreenRect.width / gameScreenRect.height) : gameScreenRect;
 
 	// Simple mirror mode implementation: Just mirror the whole screen
 	if (config.mMirrorMode)
 	{
-		drawer.drawRect(gameScreenRect, videoOut.getGameScreenTexture(), Vec2f(1.0f, 0.0f), Vec2f(0.0f, 1.0f), Color::WHITE);
+		drawer.drawRect(backgroundRect, videoOut.getGameScreenTexture(), Vec2f(1.0f, 0.0f), Vec2f(0.0f, 1.0f), Color::WHITE);
 	}
 	else
 	{
-		drawer.drawRect(gameScreenRect, videoOut.getGameScreenTexture());
+		drawer.drawRect(backgroundRect, videoOut.getGameScreenTexture());
 	}
 
 	// Enable alpha for the UI
@@ -708,19 +721,19 @@ void GameView::render()
 	drawer.performRendering();
 
 	// Render the (pixelated) game UI
-	mRect = gameScreenRect;
+	mRect = compositionRect;
 	GuiBase::render();
 
 	// White overlay (used in Time Attack restart)
 	if (mWhiteOverlayAlpha > 0.0f)
 	{
-		drawer.drawRect(gameScreenRect, Color(1.0f, 1.0f, 1.0f, mWhiteOverlayAlpha));
+		drawer.drawRect(compositionRect, Color(1.0f, 1.0f, 1.0f, mWhiteOverlayAlpha));
 	}
 
 	// Fade from / to black
 	if (mFadeValue < 1.0f)
 	{
-		drawer.drawRect(gameScreenRect, Color(0.0f, 0.0f, 0.0f, 1.0f - mFadeValue));
+		drawer.drawRect(compositionRect, Color(0.0f, 0.0f, 0.0f, 1.0f - mFadeValue));
 	}
 
 	if (config.mPerformanceDisplay == 1)

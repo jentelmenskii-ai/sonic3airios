@@ -295,7 +295,7 @@ void Simulation::update(float timeElapsed)
 		mCurrentTargetFrame = roundToDouble(mCurrentTargetFrame + 1.0);
 	}
 
-	const bool useFrameInterpolation = (Configuration::instance().mFrameSync == Configuration::FrameSyncType::FRAME_INTERPOLATION);
+	const bool useFrameInterpolation = !Configuration::instance().mClassicMode && (Configuration::instance().mFrameSync == Configuration::FrameSyncType::FRAME_INTERPOLATION);
 	const uint32 requiredFrameNumber = useFrameInterpolation ? (uint32)std::ceil(mCurrentTargetFrame) : (uint32)roundToInt(mCurrentTargetFrame);
 
 	if (mFrameNumber < requiredFrameNumber)
@@ -309,6 +309,13 @@ void Simulation::update(float timeElapsed)
 			const bool result = generateFrame();
 			if (!result)
 				break;
+			// A game callback can pause at an act boundary. Do not execute the
+			// remaining catch-up frames or carry their time into the next update.
+			if (mSimulationSpeed <= 0.0f)
+			{
+				mCurrentTargetFrame = (double)mFrameNumber;
+				break;
+			}
 
 			// Time limit to prevent non-responding application
 			if (SDL_GetTicks() >= limitTime)
@@ -563,7 +570,7 @@ int Simulation::setRewind(int rewindSteps)
 
 float Simulation::getSimulationFrequency() const
 {
-	return (mSimulationFrequencyOverride > 0.0f) ? mSimulationFrequencyOverride : (float)Configuration::instance().mSimulationFrequency;
+	return Configuration::instance().mClassicMode ? 60.0f : ((mSimulationFrequencyOverride > 0.0f) ? mSimulationFrequencyOverride : (float)Configuration::instance().mSimulationFrequency);
 }
 
 void Simulation::setSpeed(float emulatorSpeed)

@@ -28,6 +28,7 @@ public:
 	};
 
 public:
+	void setTransient(bool enabled) { mTransient = enabled; }
 	void clear();
 	void loadFromBasePath(const std::wstring& basePath);
 
@@ -56,6 +57,7 @@ private:
 	bool serializeFile(File& file, VectorBinarySerializer& serializer);
 
 private:
+	bool mTransient = false;
 	std::wstring mBasePath;
 	std::unordered_map<uint64, File> mFiles;
 	std::unordered_set<uint64> mPendingFileSaves;

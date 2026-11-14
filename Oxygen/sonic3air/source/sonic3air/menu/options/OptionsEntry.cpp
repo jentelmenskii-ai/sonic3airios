@@ -10,6 +10,8 @@
 #include "sonic3air/menu/options/OptionsEntry.h"
 #include "sonic3air/menu/GameMenuBase.h"
 #include "sonic3air/Game.h"
+#include "sonic3air/ConfigurationImpl.h"
+#include "sonic3air/data/ClassicModeRules.h"
 #include "oxygen/engine/modding/Mod.h"
 
 
@@ -22,6 +24,9 @@ void OptionEntry::loadValue()
 	{
 		case OptionEntry::Type::SETTING:
 		{
+			uint32 forcedValue;
+			if (ClassicModeRules::forcedSetting(mSetting, forcedValue))
+				mGameMenuEntry->setInteractable(!Configuration::instance().mClassicMode);
 			const uint32 value = Game::instance().getSetting(mSetting, true);
 			mGameMenuEntry->setSelectedIndexByValue(value);
 			break;
@@ -149,7 +154,12 @@ void OptionEntry::applyValue()
 		case OptionEntry::Type::CONFIG_BOOL:
 		{
 			bool* ptr = reinterpret_cast<bool*>(mValuePointer);
-			*ptr = (value != 0);
+			if (ptr == &Configuration::instance().mSharedModeSaves)
+			{
+				Game::instance().setSharedModeSaves(value != 0);
+				loadValue();
+			}
+			else *ptr = (value != 0);
 			break;
 		}
 

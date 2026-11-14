@@ -95,6 +95,14 @@ namespace detail
 }
 
 
+void PlayerProgress::reset()
+{
+	mAchievements = {};
+	mUnlocks = {};
+	mSavedAchievements = {};
+	mSavedUnlocks = {};
+}
+
 bool PlayerProgress::load()
 {
 	// Prefer loading from persistent data
@@ -126,6 +134,8 @@ bool PlayerProgress::load()
 	}
 	else
 	{
+		// Classic never migrates Anniversary progress from the shared legacy file.
+		if (Configuration::instance().mClassicMode && !Configuration::instance().mSharedModeSaves) return false;
 		// Try to load from old "playerprogress.bin"
 		std::vector<uint8> buffer;
 		if (!FTX::FileSystem->readFile(Configuration::instance().mAppDataPath + L"playerprogress.bin", buffer))
@@ -175,7 +185,7 @@ void PlayerProgress::save(bool force)
 		buffer.clear();
 		{
 			VectorBinarySerializer serializer(false, buffer);
-			mAchievements.serializeAchievements(serializer);
+			mUnlocks.serializeFinishedZoneActs(serializer);
 			persistentData.setData("s3air_unlocks", "FinishedZoneActs", buffer);
 		}
 

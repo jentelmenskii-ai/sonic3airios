@@ -1,0 +1,21 @@
+// Offline achievement events. Keep values in sync with data/RetroAchievements.h.
+constant u32 RA_FRAME = 0
+constant u32 RA_LEVEL_START = 1
+constant u32 RA_ACT_FINISH = 2
+constant u32 RA_DAMAGE = 3
+constant u32 RA_DEATH = 4
+constant u32 RA_BONUS_ENTER = 5
+constant u32 RA_GAME_FINISH = 6
+constant u32 RA_SPECIAL_START = 7
+constant u32 RA_SPECIAL_FRAME = 8
+constant u32 RA_SPECIAL_WIN = 9
+constant u32 RA_JACKPOT_EVENT = 10
+constant u32 RA_GLOW_EXIT_EVENT = 11
+constant u32 RA_SHIELD_CHANGE = 12
+constant u32 RA_LIFE_MONITOR = 13
+constant u32 RA_HPZ_WIN = 14
+constant u32 RA_DEZ_ROBO = 15
+constant u32 RA_COMPETITION_FINISH = 16
+constant u32 RA_CHEAT_EVENT = 17
+constant u32 RA_PAUSE = 18
+constant u32 RA_INVALIDATE = 19

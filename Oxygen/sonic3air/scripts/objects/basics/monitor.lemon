@@ -788,6 +788,10 @@ function void ItemEffect.ApplySpeedUp()
 
 function void ItemEffect.applyShield(u8 shieldType, u32 updateRoutine, u8 soundId)
 {
+#if GAMEAPP
+	if (global.zone == 0x13 && A1 == 0xffffb000)
+		Game.retroEvent(RA_SHIELD_CHANGE, shieldType, 0)
+#endif
 	++u16[A2]
 	u8[A1 + 0x2b] &= ~char.bonus.ALL_SHIELDS
 	u8[A1 + 0x2b] |= (char.bonus.ANY_SHIELD | shieldType)

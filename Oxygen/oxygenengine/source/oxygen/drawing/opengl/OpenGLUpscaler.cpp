@@ -62,6 +62,7 @@ void OpenGLUpscaler::shutdown()
 void OpenGLUpscaler::renderImage(const Recti& rect, GLuint textureHandle, Vec2i textureResolution)
 {
 	const Configuration::ScreenFilter& config = Configuration::instance().mScreenFilter;
+	const Recti outputRect = FTX::Video->getDrawableRect(rect);
 
 	// Select upscaler
 	const UpscalerDefinition::Variant* variant = nullptr;
@@ -152,7 +153,7 @@ void OpenGLUpscaler::renderImage(const Recti& rect, GLuint textureHandle, Vec2i 
 		if (mType == Type::PIXEL)
 		{
 			// PixelFactor is at least 1.0f, which is basically bilinear sampling, infinity would be point sampling
-			float pixelFactor = rect.height / (float)textureResolution.y;
+			float pixelFactor = outputRect.height / (float)textureResolution.y;
 			pixelFactor *= (config.mPixelVariant == 0) ? 1000.0f : (config.mPixelVariant == 1) ? 2.0f : 1.0f;
 			firstShader->setParam("PixelFactor", clamp(pixelFactor, 1.0f, 1000.0f));
 
@@ -184,7 +185,7 @@ void OpenGLUpscaler::renderImage(const Recti& rect, GLuint textureHandle, Vec2i 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		// And then the second pass
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_FRAMEBUFFER, FTX::Video->getDefaultFramebuffer());
 
 		if (mPass0Texture.getSize() != textureResolution)
 		{
@@ -193,15 +194,15 @@ void OpenGLUpscaler::renderImage(const Recti& rect, GLuint textureHandle, Vec2i 
 
 		secondShader->bind();
 		secondShader->setParam("GameResolution", Vec2f(textureResolution));
-		secondShader->setParam("OutputSize", Vec2f(rect.getSize()));
+		secondShader->setParam("OutputSize", Vec2f(outputRect.getSize()));
 		secondShader->setTexture("MainTexture", mPass0Texture.getHandle(), GL_TEXTURE_2D);
 		secondShader->setTexture("OrigTexture", textureHandle, GL_TEXTURE_2D);
 	}
 
 	// Flip rect in y direction
-	glViewport_Recti(Recti(rect.x, FTX::screenHeight() - rect.height - rect.y, rect.width, rect.height));
+	glViewport_Recti(FTX::Video->getDrawableRect(Recti(rect.x, FTX::screenHeight() - rect.height - rect.y, rect.width, rect.height)));
 	glDrawArrays(GL_TRIANGLES, 0, 6);
-	glViewport_Recti(FTX::screenRect());
+	glViewport_Recti(FTX::Video->getDrawableRect(FTX::screenRect()));
 
 	secondShader->unbind();
 	OpenGLShader::resetLastUsedShader();

@@ -367,7 +367,7 @@ void ControllerSetupMenu::render()
 	const bool isGamepad = (nullptr != device && device->mType == InputConfig::DeviceType::GAMEPAD);
 	const int gamepadButtonStyle = clamp(ConfigurationImpl::instance().mGamepadVisualStyle, 0, 2);
 
-	const int baseX = 200;
+	const int baseX = mRect.width / 2;
 	int py = startY;
 	if (showEmptyMenu)
 	{
@@ -508,7 +508,7 @@ void ControllerSetupMenu::render()
 		{
 			// Entry without options
 			py += (entry.mData == ::_BACK) ? 10 : 4;
-			drawer.printText(global::mOxyfontRegular, Recti(0, py, 400, 10), text, 5, color);
+			drawer.printText(global::mOxyfontRegular, Recti(0, py, mRect.width, 10), text, 5, color);
 
 			if (isSelected)
 			{
@@ -526,12 +526,12 @@ void ControllerSetupMenu::render()
 		{
 			// It's an actual options entry, with multiple options to choose from
 			py += 4 + entry.mMarginAbove;
-			Font& font = global::mOxyfontRegular;
+			Font& font = Configuration::instance().mClassicMode ? global::mOxyfontSmall : global::mOxyfontRegular;
 
 			const bool canGoLeft  = (entry.mSelectedIndex > 0);
 			const bool canGoRight = (entry.mSelectedIndex < entry.mOptions.size() - 1);
 
-			const int center = baseX + (entry.mText.empty() ? 0 : 88);
+			const int center = baseX + (entry.mText.empty() ? 0 : (Configuration::instance().mClassicMode ? 68 : 88));
 			int arrowDistance = 100;
 			if (isSelected)
 			{
@@ -542,7 +542,7 @@ void ControllerSetupMenu::render()
 			if (!entry.mText.empty())
 			{
 				// Description
-				drawer.printText(font, Recti(baseX - 40, py, 0, 10), entry.mText, 6, color);
+				drawer.printText(font, Recti(baseX - (Configuration::instance().mClassicMode ? 30 : 40), py, 0, 10), entry.mText, 6, color);
 				arrowDistance -= 50;
 			}
 

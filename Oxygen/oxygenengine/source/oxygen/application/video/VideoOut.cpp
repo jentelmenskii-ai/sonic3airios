@@ -7,6 +7,7 @@
 */
 
 #include "oxygen/pch.h"
+#include "oxygen/helper/ClassicScreenLayout.h"
 #include "oxygen/application/video/VideoOut.h"
 #include "oxygen/application/Configuration.h"
 #include "oxygen/drawing/opengl/OpenGLDrawer.h"
@@ -41,7 +42,7 @@ VideoOut::~VideoOut()
 
 void VideoOut::startup()
 {
-	mGameResolution = Configuration::instance().mGameScreen;
+	mGameResolution = ClassicScreenLayout::constrain(Configuration::instance().mClassicMode, Configuration::instance().mGameScreen);
 
 	RMX_LOG_INFO("VideoOut: Setup of game screen");
 	mGameScreenTexture.setupAsRenderTarget(mGameResolution);
@@ -128,8 +129,7 @@ void VideoOut::setActiveRenderer(bool useOpenGLRenderer, bool reset)
 
 void VideoOut::setScreenSize(uint32 width, uint32 height)
 {
-	mGameResolution.x = width;
-	mGameResolution.y = height;
+	mGameResolution = ClassicScreenLayout::constrain(Configuration::instance().mClassicMode, Vec2i(width, height));
 
 	mGameScreenTexture.setupAsRenderTarget(mGameResolution);
 
@@ -195,7 +195,7 @@ void VideoOut::setInterFramePosition(float position)
 
 bool VideoOut::updateGameScreen()
 {
-	mFrameInterpolation.mCurrentlyInterpolating = (Configuration::instance().mFrameSync == Configuration::FrameSyncType::FRAME_INTERPOLATION && mFrameInterpolation.mUseInterpolationLastUpdate && mFrameInterpolation.mUseInterpolationThisUpdate);
+	mFrameInterpolation.mCurrentlyInterpolating = (!Configuration::instance().mClassicMode && Configuration::instance().mFrameSync == Configuration::FrameSyncType::FRAME_INTERPOLATION && mFrameInterpolation.mUseInterpolationLastUpdate && mFrameInterpolation.mUseInterpolationThisUpdate);
 
 	// Only render something if a frame simulation was completed in the meantime
 	const bool hasNewSimulationFrame = (mFrameState == FrameState::FRAME_READY);

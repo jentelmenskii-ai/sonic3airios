@@ -172,6 +172,8 @@ void EngineMain::switchToRenderMethod(Configuration::RenderMethod newRenderMetho
 
 void EngineMain::setVSyncMode(Configuration::FrameSyncType frameSyncMode)
 {
+	if (Configuration::instance().mClassicMode)
+		frameSyncMode = Configuration::FrameSyncType::VSYNC_OFF;
 	Configuration& config = Configuration::instance();
 	if ((config.mRenderMethod == Configuration::RenderMethod::OPENGL_FULL) || (config.mRenderMethod == Configuration::RenderMethod::OPENGL_SOFT))
 	{
@@ -738,6 +740,10 @@ bool EngineMain::createWindow()
 		const int displayIndex = config.mDisplayIndex;
 
 		uint32 flags = useOpenGL ? SDL_WINDOW_OPENGL : 0;
+	#if defined(PLATFORM_IOS) && !defined(RMX_USE_SDL3)
+		if (useOpenGL)
+			flags |= SDL_WINDOW_ALLOW_HIGHDPI;
+	#endif
 		switch (config.mWindowMode)
 		{
 			case Configuration::WindowMode::WINDOWED:
@@ -823,6 +829,12 @@ bool EngineMain::createWindow()
 			SDL_GLContext context = SDL_GL_CreateContext(mSDLWindow);
 			if (nullptr != context)
 			{
+			#if defined(PLATFORM_IOS) && !defined(RMX_USE_SDL3)
+				int drawableWidth = 0, drawableHeight = 0;
+				SDL_GL_GetDrawableSize(mSDLWindow, &drawableWidth, &drawableHeight);
+				RMX_LOG_INFO("Retina output: window " << videoConfig.mWindowRect.width << " x " << videoConfig.mWindowRect.height
+					<< ", drawable " << drawableWidth << " x " << drawableHeight);
+			#endif
 				RMX_LOG_INFO("Vsync setup...");
 				setVSyncMode(config.mFrameSync);
 			}

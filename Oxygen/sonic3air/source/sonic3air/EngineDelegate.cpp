@@ -176,7 +176,8 @@ void EngineDelegate::onControlsUpdate()
 
 void EngineDelegate::onPreSaveStateLoad()
 {
-	mGame.resetCurrentMode();
+	mGame.retroEvent(retroachievements::INVALIDATE, 0, 0);
+	if (!mGame.prepareReplayForStateLoad()) mGame.resetCurrentMode();
 }
 
 void EngineDelegate::onApplicationLostFocus()

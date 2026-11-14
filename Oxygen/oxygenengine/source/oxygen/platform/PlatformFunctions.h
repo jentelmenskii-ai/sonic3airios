@@ -57,6 +57,10 @@ public:
 
 	static void openFileExternal(const std::wstring& path);
 	static void openDirectoryExternal(const std::wstring& path);
+#if defined(PLATFORM_IOS)
+	// Installed by the native UIKit entry point; optional for other iOS hosts.
+	static void (*mOpenDirectoryHandler)(const std::wstring& path);
+#endif
 	static void openURLExternal(const std::string& url);
 	static bool openApplicationExternal(const std::wstring& path, const std::wstring& arguments, const std::wstring& directory = L"");
 

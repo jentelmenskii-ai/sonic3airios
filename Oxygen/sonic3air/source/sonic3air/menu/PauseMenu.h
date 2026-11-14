@@ -30,6 +30,7 @@ public:
 	inline void enableRestart(bool enable)  { mRestartEnabled = enable; }
 
 	void onReturnFromOptions();
+	void showReplaySavePrompt();
 
 private:
 	enum class State
@@ -56,6 +57,7 @@ private:
 	float mTimeShown = 0.0f;
 	bool mIsEnabled = true;
 
+	bool mReplaySavePrompt = false;
 	bool mScreenshotMode = false;
 	bool mRestartEnabled = false;
 	Vec2i mRestoreGameResolution;

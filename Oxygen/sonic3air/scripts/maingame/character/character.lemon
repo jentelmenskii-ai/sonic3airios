@@ -5525,6 +5525,10 @@ function void Character.OnThreatCollisionInner()
 //# address-hook(0x010294) end(0x010364)
 function void Character.GettingHurt()
 {
+#if GAMEAPP
+	if (A0 == 0xffffb000)
+		Game.retroEvent(RA_DAMAGE, 0, 0)
+#endif
 	bool canLoseShield = true	// Usually true, gets false e.g. for 2nd player Tails
 	bool isProtectedByObject = ((char.protection_flag & 0x80) != 0)
 	bool spilledRings = false

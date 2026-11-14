@@ -7,6 +7,7 @@
 */
 
 #include "rmxmedia.h"
+#include "rmxmedia/framework/WindowPixelMapping.h"
 
 #if defined(PLATFORM_WINDOWS)
 	#pragma warning(disable: 4005)	// Macro redefinition of APIENTRY
@@ -21,6 +22,9 @@
 
 	#define WIN32_LEAN_AND_MEAN
 	#include "CleanWindowsInclude.h"
+
+#elif defined(PLATFORM_IOS)
+	#include <SDL_syswm.h>
 
 #elif defined(PLATFORM_WEB)
 	#include <emscripten.h>
@@ -227,8 +231,40 @@ namespace rmx
 	*/
 	}
 
+	uint32 VideoManager::getDefaultFramebuffer() const
+	{
+	#if defined(PLATFORM_IOS)
+		// UIKit has a nonzero framebuffer. Ask SDL again after rotation / recreation.
+		SDL_Window* window = mMainWindow ? mMainWindow : SDL_GL_GetCurrentWindow();
+		SDL_SysWMinfo info;
+		SDL_VERSION(&info.version);
+		if (window && SDL_GetWindowWMInfo(window, &info) && info.subsystem == SDL_SYSWM_UIKIT)
+			return info.info.uikit.framebuffer;
+	#endif
+		return 0;
+	}
+
+	Recti VideoManager::getDrawableRect(const Recti& windowRect) const
+	{
+	#if defined(PLATFORM_IOS) && !defined(RMX_USE_SDL3)
+		SDL_Window* window = mMainWindow ? mMainWindow : SDL_GL_GetCurrentWindow();
+		if (window)
+		{
+			Vec2i logicalSize(0, 0), drawableSize(0, 0);
+			SDL_GetWindowSize(window, &logicalSize.x, &logicalSize.y);
+			SDL_GL_GetDrawableSize(window, &drawableSize.x, &drawableSize.y);
+			return mapWindowRectToPixels(windowRect, logicalSize, drawableSize);
+		}
+	#endif
+		return windowRect;
+	}
+
 	void VideoManager::beginRendering()
 	{
+	#if defined(PLATFORM_IOS)
+		if (mVideoConfig.mRenderer == VideoConfig::Renderer::OPENGL)
+			glBindFramebuffer(GL_FRAMEBUFFER, getDefaultFramebuffer());
+	#endif
 		if (mVideoConfig.mAutoClearScreen)
 		{
 		#ifdef RMX_WITH_OPENGL_SUPPORT

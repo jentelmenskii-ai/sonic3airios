@@ -32,6 +32,9 @@ function void LevelResults.Update()
 //# address-hook(0x02dae6) end(0x02dbc8)
 function void fn02dae6()
 {
+#if GAMEAPP
+	Game.retroEvent(RA_ACT_FINISH, (global.zone_act == 0x1600) ? 0x1600 : global.zone_act.apparent, 0)
+#endif
 	playMusic(MUSIC_CTRL_FADEOUT)
 
 	Kosinski.addToDMAQueue(0x0d6a62, 0xa400)		// Common results graphics

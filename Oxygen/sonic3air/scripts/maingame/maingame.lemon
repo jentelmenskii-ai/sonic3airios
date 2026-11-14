@@ -24,6 +24,9 @@ function void GameMode.MainGame()
 #endif
 
 	initializeMainGame()
+#if GAMEAPP
+	Game.retroEvent(RA_LEVEL_START, 0, 0)
+#endif
 
 	if (competition_mode.active == 0)
 	{

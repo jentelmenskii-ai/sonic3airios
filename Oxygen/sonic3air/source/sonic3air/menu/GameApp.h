@@ -40,6 +40,7 @@ public:
 	void openOptionsMenuInGame();
 	void onFadedOutOptions();
 	void onGamePaused(bool canRestart);
+	void showReplaySavePrompt();
 	void restartTimeAttack();
 	void returnToMenu();
 

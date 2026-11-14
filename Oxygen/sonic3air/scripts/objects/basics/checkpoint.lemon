@@ -310,6 +310,9 @@ function void fn02d47e()
 		if (u8[A0 + 0x29] & 0x01)
 		{
 			global.stage_type = 2
+#if GAMEAPP
+	Game.retroEvent(RA_BONUS_ENTER, 0, 0)
+#endif
 
 		#if STANDALONE
 			// Use previously selected bonus stage

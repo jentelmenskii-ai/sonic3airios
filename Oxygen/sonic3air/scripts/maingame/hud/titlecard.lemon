@@ -172,6 +172,9 @@ function void TitleCard.Appear()
 		u8[0xffffb000 + 0x2c] = 30
 		u8[0xffffb04a + 0x2c] = 30
 		PlayMusicAfterLevelResults()
+#if GAMEAPP
+		Game.retroEvent(RA_LEVEL_START, 0, 0)
+#endif
 	}
 
 	u16[A0 + 0x48] = 0

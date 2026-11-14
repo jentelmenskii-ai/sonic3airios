@@ -1,0 +1,9 @@
+{
+  "ScriptsDir": "scripts",
+  "MainScriptName": "main.lemon",
+  "PlatformFlags": "2",
+  "StartPhase": "0",
+  "GameScreen": "400 x 224",
+  "WindowSize": "852 x 480",
+  "DevMode": { "EnforceDebugMode": "0", "SkipExitConfirmation": "0" }
+}

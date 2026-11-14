@@ -219,9 +219,23 @@ namespace rmx
 
 	void SystemManager::mainLoop()
 	{
+	#ifdef PLATFORM_IOS
+		// Process lifecycle events before any frame setup can issue GL calls.
+		// iOS forbids GPU work while the app is in the background.
+		checkSDLEvents();
+		SDL_Window* window = FTX::Video->getMainWindow();
+		if (window && (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED))
+		{
+			mTicks = SDL_GetTicks();
+			SDL_Delay(16);
+			return;
+		}
+	#endif
 		mRoot.beginFrame();
 
+	#ifndef PLATFORM_IOS
 		checkSDLEvents();
+	#endif
 		update();
 		render();
 

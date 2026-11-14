@@ -35,6 +35,8 @@ void ConfigurationImpl::fillDefaultGameProfile(GameProfile& gameProfile)
 	gameProfile.mIdentifier = "S3AIR";
 	gameProfile.mShortName = "Sonic 3 A.I.R.";
 	gameProfile.mFullName = "Sonic 3 - Angel Island Revisited";
+	// Source-based bundles need an entry point even without oxygenproject.json.
+	gameProfile.mMainScriptName = L"main.lemon";
 
 	gameProfile.mRomCheck.mSize = 0x400000;
 	gameProfile.mRomCheck.mChecksum = 0x344983ffcfeff8cb;
@@ -59,7 +61,12 @@ void ConfigurationImpl::preLoadInitialization()
 {
 	SharedDatabase::initialize();
 
+#if defined(PLATFORM_IOS)
+	// The signed app bundle is read-only; compiled script caches belong in Documents.
+	mCompiledScriptSavePath = mAppDataPath + L"scripts.bin";
+#else
 	mCompiledScriptSavePath = L"saves/scripts.bin";
+#endif
 }
 
 bool ConfigurationImpl::loadConfigurationInternal(JsonSerializer& serializer)
@@ -126,6 +133,14 @@ void ConfigurationImpl::serializeSettingsInternal(JsonSerializer& serializer)
 
 	// Input
 	serializer.serialize("GamepadVisualStyle", mGamepadVisualStyle);
+
+	// Selected edition is global; each edition has independent progress.
+	serializer.serialize("ClassicMode", mClassicMode);
+	serializer.serialize("SharedModeSaves", mSharedModeSaves);
+	serializer.serialize("SpeedrunMode", mSpeedrunMode);
+	serializer.serialize("ReplayMode", mReplayMode);
+	serializer.serialize("ReplayScope", mReplayScope);
+	mReplayScope = clamp(mReplayScope, 0, 3);
 
 	// Game simulation
 	serializer.serialize("SimulationFrequency", mSimulationFrequency);

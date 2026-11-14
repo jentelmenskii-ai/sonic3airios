@@ -210,6 +210,7 @@ void GameApp::openTitleScreen()
 
 void GameApp::openMainMenu()
 {
+	Game::instance().stopReplay();
 	Application::instance().getSimulation().setRunning(false);
 	AudioOut::instance().stopSoundContext(AudioOut::CONTEXT_INGAME + AudioOut::CONTEXT_MUSIC);
 	AudioOut::instance().stopSoundContext(AudioOut::CONTEXT_INGAME + AudioOut::CONTEXT_SOUND);
@@ -255,6 +256,7 @@ void GameApp::onFadedOutOptions()
 
 		ControlsIn::instance().setAllIgnores();
 
+		Configuration::instance().mClassicMenuActive = false;
 		VideoOut::instance().setScreenSize(mRestoreGameResolution);
 
 		GameApp::instance().getGameView().startFadingIn(0.1f);
@@ -282,6 +284,12 @@ void GameApp::onGamePaused(bool canRestart)
 	{
 		mGameView->addChild(*mPauseMenu);
 	}
+}
+
+void GameApp::showReplaySavePrompt()
+{
+	onGamePaused(false);
+	mPauseMenu->showReplaySavePrompt();
 }
 
 void GameApp::restartTimeAttack()

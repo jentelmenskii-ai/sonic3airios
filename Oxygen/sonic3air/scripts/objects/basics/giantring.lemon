@@ -265,6 +265,9 @@ function void fn061892()
 {
 	global.sk_bluespheres = D0.u8
 	global.stage_type = 1
+#if GAMEAPP
+	Game.retroEvent(RA_BONUS_ENTER, 0, 0)
+#endif
 	global.game_mode = 0x34		// Special Stage
 	global.in_extra_stage = 1
 	fn0618d0()
@@ -275,6 +278,9 @@ function void fn061892()
 function void fn0618ac()
 {
 	global.stage_type = 2
+#if GAMEAPP
+	Game.retroEvent(RA_BONUS_ENTER, 0, 0)
+#endif
 	global.zone_act = 0x1701		// Hidden Palace emerald cave
 	global.zone_act.apparent = 0x1701
 	checkpoint.number = 0

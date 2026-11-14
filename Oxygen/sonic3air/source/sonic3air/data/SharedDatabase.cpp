@@ -8,6 +8,7 @@
 
 #include "sonic3air/pch.h"
 #include "sonic3air/data/SharedDatabase.h"
+#include "sonic3air/data/RetroAchievementCatalog.h"
 #include "sonic3air/ConfigurationImpl.h"
 
 #include "oxygen/application/Configuration.h"
@@ -72,6 +73,14 @@ void SharedDatabase::initialize()
 		addAchievement(Achievement::ACHIEVEMENT_MHZ_OPEN_MONITORS,		"Display smasher", "Open 18 monitors in Mushroom Hill Zone Act 1 with Knuckles.", "", "monitors");
 		addAchievement(Achievement::ACHIEVEMENT_FBZ_FREE_ANIMALS,		"Squirrels on a plane", "Free 35 animals in Flying Battery Zone Act 1 before the boss.", "", "animals");
 		addAchievement(Achievement::ACHIEVEMENT_SSZ_DECOYS,				"No touchy", "Fight the second boss in Sonic's Sky Sanctuary but pop at most one of the inflatable Mechas.", "", "decoys");
+
+		// Keep the original AIR achievements and their serialized IDs intact.
+		for (unsigned i = 0; i < retroachievements::COUNT; ++i)
+		{
+			const auto& entry = retroachievements::CATALOG[i];
+			addAchievement(static_cast<Achievement::Type>(retroachievements::ID_BASE + i),
+				entry.name, entry.description, "", entry.image);
+		}
 
 		for (Achievement& achievement : mAchievements)
 		{

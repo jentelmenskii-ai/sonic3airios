@@ -89,6 +89,10 @@ function void Standalone.onResumeAfterPause()
 
 function void Standalone.onMonitorOpened()
 {
+#if GAMEAPP
+	if (objA0.subtype2c == 1)
+		Game.retroEvent(RA_LIFE_MONITOR, objA0.position.x.u16, objA0.position.y.u16)
+#endif
 	if (global.zone_act == 0x0700)
 	{
 		u8 count = Game.getAchievementValue(ACHIEVEMENT_MHZ_OPEN_MONITORS) + 1

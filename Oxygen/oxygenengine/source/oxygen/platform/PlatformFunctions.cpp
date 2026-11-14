@@ -560,9 +560,16 @@ void PlatformFunctions::openFileExternal(const std::wstring& path)
 #endif
 }
 
+#if defined(PLATFORM_IOS)
+void (*PlatformFunctions::mOpenDirectoryHandler)(const std::wstring& path) = nullptr;
+#endif
+
 void PlatformFunctions::openDirectoryExternal(const std::wstring& path)
 {
-#if defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_IOS)
+	if (mOpenDirectoryHandler)
+		mOpenDirectoryHandler(path);
+#elif defined(PLATFORM_WINDOWS)
 	::ShellExecuteW(nullptr, L"open", L"explorer", (L"file://" + path).c_str(), nullptr, SW_SHOW);
 #elif defined(PLATFORM_MAC)
 	system(*(String("open \"") + WString(path).toString() + "\""));

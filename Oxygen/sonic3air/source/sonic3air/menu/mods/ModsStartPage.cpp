@@ -29,7 +29,9 @@ void ModsStartPage::initialize()
 	if (!mMenuEntries.empty())
 		return;
 
-#if defined(PLATFORM_WINDOWS) || defined(PLATFORM_MAC) || defined(PLATFORM_LINUX)
+#if defined(PLATFORM_IOS)
+	mMenuEntries.addEntry("Open mods folder", (uint32)Option::OPEN_MODS_FOLDER);
+#elif defined(PLATFORM_WINDOWS) || defined(PLATFORM_MAC) || defined(PLATFORM_LINUX)
 	mMenuEntries.addEntry("Open mods " PLATFORM_DIRECTORY_STRING, (uint32)Option::OPEN_MODS_FOLDER);
 #endif
 
@@ -100,9 +102,15 @@ void ModsStartPage::render(Drawer& drawer, float visibility)
 	rect.y += 22;
 
 	Color color(0.8f, 0.9f, 1.0f, visibility);
+#if defined(PLATFORM_IOS)
+	drawer.printText(global::mOxyfontSmall, rect, "Copy extracted mod folders into Documents/mods.", 1, color);
+	rect.y += 14;
+	drawer.printText(global::mOxyfontSmall, rect, "In Files: On My iPhone / iPad > Sonic 3 AIR > mods", 1, color);
+#else
 	drawer.printText(global::mOxyfontSmall, rect, "Have a look at the game manual PDF for instructions", 1, color);
 	rect.y += 14;
 	drawer.printText(global::mOxyfontSmall, rect, "on how to install mods.", 1, color);
+#endif
 	rect.y += 18;
 	drawer.printText(global::mOxyfontSmall, rect, "Note that you will have to restart Sonic 3 A.I.R.", 1, color);
 	rect.y += 14;

@@ -652,6 +652,9 @@ function void fn06429e()
 	{
 		// Defeated
 		fn064310()
+#if GAMEAPP
+	Game.retroEvent(RA_HPZ_WIN, 0, 0)
+#endif
 	}
 	else
 	{

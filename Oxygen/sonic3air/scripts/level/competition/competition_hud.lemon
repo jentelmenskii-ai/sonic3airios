@@ -147,6 +147,9 @@ function void fn0371be()
 			hud.dirty.timer = 0x80
 
 			fn037430()
+#if GAMEAPP
+	Game.retroEvent(RA_COMPETITION_FINISH, global.zone, ((competition_mode.time_record.player1 >> 16) * 60 + ((competition_mode.time_record.player1 >> 8) & 0xff)) * 100 + (competition_mode.time_record.player1 & 0xff))
+#endif
 			playSound(0x6a)
 
 			D0.u8 = competition_mode.laps

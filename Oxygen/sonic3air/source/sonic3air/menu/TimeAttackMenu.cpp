@@ -266,7 +266,7 @@ void TimeAttackMenu::render()
 
 	Drawer& drawer = EngineMain::instance().getDrawer();
 
-	int anchorX = 200;
+	int anchorX = mRect.width / 2;
 	float alpha = 1.0f;
 	if (mState != State::SHOW && mState != State::FADE_TO_GAME)
 	{
@@ -297,11 +297,11 @@ void TimeAttackMenu::render()
 			arrowAnimOffset = (arrowAnimOffset > 3) ? (6 - arrowAnimOffset) : arrowAnimOffset;
 		}
 
-		int px = 200;
+		int px = mRect.width / 2;
 		if (mState != State::SHOW && mState != State::FADE_TO_GAME)
 		{
 			const int lineOffset = (mState < State::SHOW) ? (int)(mMenuEntries.size() - 1 - line) : (int)line;
-			px = 200 + roundToInt(saturate(1.0f - alpha - lineOffset * 0.15f) * 200.0f);
+			px = mRect.width / 2 + roundToInt(saturate(1.0f - alpha - lineOffset * 0.15f) * 200.0f);
 		}
 
 		if (canGoLeft)
@@ -314,7 +314,7 @@ void TimeAttackMenu::render()
 
 	for (int i = 0; i < 5; ++i)
 	{
-		Recti rect(anchorX + 90, 118 + i * 18, 80, 18);
+		Recti rect(anchorX + (Configuration::instance().mClassicMode ? 70 : 90), 118 + i * 18, 80, 18);
 		if (i < (int)mBestTimes.size())
 			drawer.printText(global::mOxyfontRegular, rect, mBestTimes[i], 5, Color(1.0f, 1.0f, 1.0f, alpha));
 		else

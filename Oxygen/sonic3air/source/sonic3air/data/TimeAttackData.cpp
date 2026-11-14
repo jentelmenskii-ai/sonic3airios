@@ -9,6 +9,7 @@
 #include "sonic3air/pch.h"
 #include "sonic3air/data/TimeAttackData.h"
 #include "sonic3air/data/SharedDatabase.h"
+#include "sonic3air/data/ClassicModeRules.h"
 
 #include "oxygen/application/Configuration.h"
 #include "oxygen/helper/JsonHelper.h"
@@ -110,7 +111,7 @@ std::wstring TimeAttackData::getSavePath(uint16 zoneAndAct, uint8 category, std:
 	{
 		*outRecBaseFilename = *String(zoneAndActName + "_" + characterName).toWString();
 	}
-	return Configuration::instance().mAppDataPath + *String("timeattack/" + zoneAndActName + "_" + characterName).toWString();
+	return ClassicModeRules::saveRoot(Configuration::instance().mAppDataPath, Configuration::instance().mClassicMode, Configuration::instance().mSharedModeSaves) + *String("timeattack/" + zoneAndActName + "_" + characterName).toWString();
 }
 
 std::string TimeAttackData::getTimeString(uint32 frames, int formatOption)

@@ -10,6 +10,8 @@
 #include "oxygen/simulation/bindings/RendererBindings.h"
 #include "oxygen/simulation/bindings/LemonScriptBindings.h"
 #include "oxygen/application/video/VideoOut.h"
+#include "oxygen/application/Configuration.h"
+#include "oxygen/helper/ClassicScreenLayout.h"
 #include "oxygen/rendering/parts/RenderParts.h"
 #include "oxygen/resources/FontCollection.h"
 #include "oxygen/simulation/EmulatorInterface.h"
@@ -674,6 +676,7 @@ namespace
 
 	void Renderer_setScreenSize(uint16 width, uint16 height)
 	{
+		if (Configuration::instance().mClassicMode) { width = ClassicScreenLayout::GAME_WIDTH; height = ClassicScreenLayout::GAME_HEIGHT; }
 		width = clamp(width, 128, 1024);
 		height = clamp(height, 128, 1024);
 		VideoOut::instance().setScreenSize(width, height);

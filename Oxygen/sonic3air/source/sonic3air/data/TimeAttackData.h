@@ -25,6 +25,7 @@ public:
 	};
 
 public:
+	static void clearCache() { mTables.clear(); }
 	static Table& createTable(uint16 zoneAndAct, uint8 category);
 	static Table* getTable(uint16 zoneAndAct, uint8 category);
 

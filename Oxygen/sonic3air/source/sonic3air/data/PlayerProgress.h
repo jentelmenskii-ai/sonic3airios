@@ -51,6 +51,7 @@ public:
 	detail::PlayerUnlocksData mUnlocks;
 
 public:
+	void reset();
 	bool load();
 	void save(bool force = false);
 

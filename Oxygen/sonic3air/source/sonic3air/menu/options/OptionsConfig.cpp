@@ -452,6 +452,19 @@ void OptionsConfig::buildGameplay()
 {
 	ConfigBuilder configBuilder(mGameplayOptions);
 
+	CATEGORY("Play Modes")
+	{
+		configBuilder.addSetting("Save Profile:", option::SHARED_MODE_SAVES)
+			.addOption("Separate", 0).addOption("Shared (Anniversary)", 1);
+		configBuilder.addSetting("Speedrun Mode:", option::SPEEDRUN_MODE)
+			.addOption("Off", 0).addOption("On (2x cutscenes)", 1);
+		configBuilder.addSetting("Replay Mode:", option::REPLAY_MODE)
+			.addOption("Off", 0).addOption("On", 1);
+		configBuilder.addSetting("Replay Recording:", option::REPLAY_SCOPE)
+			.addOption("Each Act", 0).addOption("Full Zone", 1)
+			.addOption("Act 1 Only", 2).addOption("Act 2 Only", 3);
+	}
+
 	CATEGORY("Levels")
 	{
 		configBuilder.addSetting("Level Layouts:", option::LEVEL_LAYOUTS)

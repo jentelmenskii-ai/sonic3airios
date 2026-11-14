@@ -376,6 +376,7 @@ namespace opengldrawer
 		OpenGLSpriteTextureManager mSpriteTextureManager;
 
 		Recti mCurrentViewport;
+		bool mWindowRenderTarget = false;
 		Vec4f mPixelToViewSpaceTransform;	// Transformation from pixel-based coordinates view space, in the form: (x, y) = offset; (z, w) = scale
 
 		SamplingMode mCurrentSamplingMode = SamplingMode::POINT;
@@ -444,12 +445,13 @@ void OpenGLDrawer::performRendering(const DrawCollection& drawCollection)
 			{
 				SetWindowRenderTargetDrawCommand& dc = drawCommand->as<SetWindowRenderTargetDrawCommand>();
 
-				// Bind no frame buffer at all
-				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+				// Window viewports use backing pixels; drawing and input stay in logical units.
+				mInternal.mWindowRenderTarget = true;
+				glBindFramebuffer(GL_FRAMEBUFFER, FTX::Video->getDefaultFramebuffer());
 
 				const Recti& viewport = dc.mViewport;
 				mInternal.mCurrentViewport = viewport;
-				glViewport_Recti(viewport);
+				glViewport_Recti(FTX::Video->getDrawableRect(viewport));
 
 				// Flip vertically
 				mInternal.mPixelToViewSpaceTransform.x = -1.0f;
@@ -463,6 +465,7 @@ void OpenGLDrawer::performRendering(const DrawCollection& drawCollection)
 			{
 				SetRenderTargetDrawCommand& dc = drawCommand->as<SetRenderTargetDrawCommand>();
 
+				mInternal.mWindowRenderTarget = false;
 				// Bind as frame buffer
 				OpenGLDrawerTexture& drawerTexture = *dc.mTexture->getImplementation<OpenGLDrawerTexture>();
 				glBindFramebuffer(GL_FRAMEBUFFER, drawerTexture.getFrameBufferHandle());
@@ -694,7 +697,8 @@ void OpenGLDrawer::performRendering(const DrawCollection& drawCollection)
 				}
 				mInternal.mScissorStack.emplace_back(scissorRect);
 
-				glScissor(scissorRect.x, scissorRect.y, std::max(scissorRect.width, 0), std::max(scissorRect.height, 0));
+				const Recti pixelScissor = mInternal.mWindowRenderTarget ? FTX::Video->getDrawableRect(scissorRect) : scissorRect;
+				glScissor(pixelScissor.x, pixelScissor.y, std::max(pixelScissor.width, 0), std::max(pixelScissor.height, 0));
 				mInternal.mInvalidScissorRegion = scissorRect.empty();
 				break;
 			}
@@ -710,7 +714,8 @@ void OpenGLDrawer::performRendering(const DrawCollection& drawCollection)
 				else
 				{
 					const Recti scissorRect = mInternal.mScissorStack.back();
-					glScissor(scissorRect.x, scissorRect.y, std::max(scissorRect.width, 0), std::max(scissorRect.height, 0));
+					const Recti pixelScissor = mInternal.mWindowRenderTarget ? FTX::Video->getDrawableRect(scissorRect) : scissorRect;
+					glScissor(pixelScissor.x, pixelScissor.y, std::max(pixelScissor.width, 0), std::max(pixelScissor.height, 0));
 					mInternal.mInvalidScissorRegion = scissorRect.empty();
 				}
 				break;

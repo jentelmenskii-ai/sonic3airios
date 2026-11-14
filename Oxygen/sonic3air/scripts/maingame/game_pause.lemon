@@ -98,6 +98,9 @@ function bool GamePause.BeginPause()
 
 function void GamePause.Menu()
 {
+#if GAMEAPP
+	Game.retroEvent(RA_PAUSE, 0, 0)
+#endif
 	// Script implementation of game pause
 	GamePause.hasRestart = !global.pause_disabled && (global.game_mode == 0x0c && global.stage_type == 0 && u8[0xffffb000 + 0x05] <= base_state.HURT) && !competition_mode.active
 	GamePause.hasOptions = !Game.isTimeAttack()

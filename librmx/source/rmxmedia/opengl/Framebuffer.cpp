@@ -177,7 +177,7 @@ void Framebuffer::bind()
 
 void Framebuffer::unbind()
 {
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, FTX::Video->getDefaultFramebuffer());
 }
 
 void Framebuffer::activate()

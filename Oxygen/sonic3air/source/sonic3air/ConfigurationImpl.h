@@ -54,6 +54,10 @@ public:
 	int mGamepadVisualStyle = 1;
 #endif
 
+	bool mSpeedrunMode = false;
+	bool mReplayMode = false;
+	int mReplayScope = 0; // s3air::ReplayScope; selected before starting a run
+
 	// Time Attack
 	int mInstantTimeAttackRestart = 0;
 

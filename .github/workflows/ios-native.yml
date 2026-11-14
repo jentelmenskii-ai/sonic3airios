@@ -1,0 +1,119 @@
+name: Native iOS IPA
+on:
+  push:
+    branches: [main, ios-native]
+    paths:
+      - 'Oxygen/**'
+      - 'librmx/**'
+      - 'framework/**'
+      - '.github/workflows/ios-native.yml'
+  pull_request:
+    branches: [ios-native]
+    paths:
+      - 'Oxygen/**'
+      - 'librmx/**'
+      - 'framework/**'
+      - '.github/workflows/ios-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  profile-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify script profile and Retina rectangle mapping
+        run: bash Oxygen/sonic3air/build/_ios/tests/run-profile-test.sh
+  build:
+    needs: profile-test
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Ensure Ninja is available
+        run: command -v ninja || brew install ninja
+      - name: Configure native arm64 iPhone build
+        run: >-
+          cmake -S Oxygen/sonic3air/build/_ios -B build-ios -G Ninja
+          -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos
+          -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+          -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+      - name: Compile
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build build-ios --config Release --parallel 3 2>&1 | tee build-ios/build.log
+      - name: Verify app resources and icons
+        run: python3 Oxygen/sonic3air/build/_ios/tests/verify-bundle.py build-ios/Sonic3AIR.app
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ipa/Payload
+          cp -R build-ios/Sonic3AIR.app ipa/Payload/
+          cd ipa
+          /usr/bin/zip -qry ../Sonic3AIR-iOS-unsigned.ipa Payload
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonic3AIR-iOS-unsigned
+          path: Sonic3AIR-iOS-unsigned.ipa
+          if-no-files-found: error
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: build-ios/build.log
+          if-no-files-found: ignore
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/ios-native'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: Sonic3AIR-iOS-unsigned
+          path: release-files
+      - name: Publish experimental iOS release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+          RELEASE_TAG: ios-v0.2.6
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipa_file="release-files/Sonic3AIR-iOS-unsigned.ipa"
+          existing_target=$(gh release view "$RELEASE_TAG" --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
+          if [ -n "$existing_target" ]; then
+            if [ "$existing_target" != "$SOURCE_SHA" ]; then
+              echo "This release tag already belongs to another commit. Bump the release version."
+              exit 1
+            fi
+            has_ipa=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | any(.name == "Sonic3AIR-iOS-unsigned.ipa")')
+            if [ "$has_ipa" != "true" ]; then
+              gh release upload "$RELEASE_TAG" "$ipa_file"
+            fi
+          else
+            gh release create "$RELEASE_TAG" "$ipa_file" \
+              --target "$SOURCE_SHA" --prerelease \
+              --title "Sonic 3 A.I.R. iOS 0.2.6 (experimental)" \
+              --notes-file Oxygen/sonic3air/build/_ios/RELEASE_NOTES.md
+          fi

@@ -298,6 +298,8 @@ LemonScriptProgram::LoadingResult LemonScriptProgram::loadAllScriptModules(lemon
 		mInternal.mScriptModule.clear();
 		const uint32 coreModuleDependencyHash = mInternal.mLemonCoreModule.buildDependencyHash() + mInternal.mOxygenCoreModule.buildDependencyHash();
 
+		RMX_LOG_INFO("Base script source: " << WString(config.mProjectPath + std::wstring(baseScriptFilename)).toStdString());
+
 		// Load scripts
 		bool scriptsLoaded = false;
 
@@ -420,8 +422,11 @@ LemonScriptProgram::LoadingResult LemonScriptProgram::loadAllScriptModules(lemon
 bool LemonScriptProgram::loadBaseScriptFromSource(lemon::GlobalsLookup& globalsLookup, std::wstring_view filename, uint32 coreModuleDependencyHash, const LoadOptions& loadOptions, LoadingResult& outLoadingResult)
 {
 	// Compile scripts from the sources, if they're present
-	if (!FTX::FileSystem->exists(filename))
+	if (!FTX::FileSystem->isFile(filename))
+	{
+		RMX_LOG_INFO("Base script source is missing or not a file: " << WString(filename).toStdString());
 		return false;
+	}
 
 	// Compile module
 	outLoadingResult = loadScriptModule(mInternal.mScriptModule, globalsLookup, filename);

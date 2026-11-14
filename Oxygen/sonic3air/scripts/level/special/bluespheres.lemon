@@ -130,6 +130,9 @@ function void SpecialStage()
 	bluespheres.bs_hud_dirty = 0xff
 	bluespheres.rings_flags = 0x80
 	bluespheres.current_gamespeed = 0x1000
+#if GAMEAPP
+	Game.retroEvent(RA_SPECIAL_START, global.next_bluespheres, global.sk_bluespheres)
+#endif
 	bluespheres.speedup_countdown = BlueSpheres.useGeneratedStages() ? 2700 : 1800
 	camera.foreground.x.u16 = 0
 	camera.foreground.y.u16 = 0
@@ -1675,6 +1678,9 @@ function void BlueSpheres.RenderSingleSphereB()
 //# address-hook(0x009b62) end(0x009d1c)
 function void fn009b62()
 {
+#if GAMEAPP
+	Game.retroEvent(RA_SPECIAL_FRAME, u16(bluespheres.movement_speed), 0)
+#endif
 	if (bluespheres.stage_exit_state == 1)
 	{
 	#if STANDALONE
@@ -1761,6 +1767,9 @@ function void fn009b62()
 
 				++bluespheres.stage_exit_state
 				bluespheres.stage_exit_animation = 1
+#if GAMEAPP
+	Game.retroEvent(RA_SPECIAL_WIN, global.next_bluespheres, global.sk_bluespheres)
+#endif
 				global.game_mode = (bluespheres.minigame_mode != 0) ? 0x30 : 0x48
 
 				if (global.stage_type != 0)

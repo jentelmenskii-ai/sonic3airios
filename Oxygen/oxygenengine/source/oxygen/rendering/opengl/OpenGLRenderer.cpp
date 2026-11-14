@@ -254,7 +254,7 @@ void OpenGLRenderer::renderGameScreen(const std::vector<Geometry*>& geometries)
 	glUseProgram(0);
 	glActiveTexture(GL_TEXTURE0);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, FTX::Video->getDefaultFramebuffer());
 	glViewport_Recti(FTX::screenRect());
 	glDisable(GL_SCISSOR_TEST);
 }
@@ -288,7 +288,7 @@ void OpenGLRenderer::blurGameScreen()
 	mInternal.mPostFxBlurShader.draw(mProcessingTexture.getHandle(), texelOffset, kernel);
 
 	glUseProgram(0);	// Unbind shader again
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, FTX::Video->getDefaultFramebuffer());
 }
 
 void OpenGLRenderer::clearFullscreenBuffer(Framebuffer& buffer)

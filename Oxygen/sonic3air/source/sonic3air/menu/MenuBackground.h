@@ -91,6 +91,8 @@ private:
 	GameMenuBase* mLastOpenedMenu = nullptr;
 	GameMenuBase* mGameStartedMenu = nullptr;
 
+	DrawerTexture mClassicLogo;
+
 	// Background
 	struct PreviewImage
 	{

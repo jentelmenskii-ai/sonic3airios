@@ -7,6 +7,7 @@
 */
 
 #include "sonic3air/pch.h"
+#include "sonic3air/scriptimpl/ScrollBuffer.h"
 #include "sonic3air/scriptimpl/ScriptImplementations.h"
 
 #include "oxygen/application/video/VideoOut.h"
@@ -45,10 +46,7 @@ namespace s3air
 	{
 		EmulatorInterface& emulatorInterface = getEmulatorInterface();
 		const int height = VideoOut::instance().getScreenHeight();
-		for (int line = 0; line < height; ++line)
-		{
-			emulatorInterface.writeMemory32(0xffffe000 + line * 4, value);
-		}
+		writeLegacyScrollOffsets(emulatorInterface, value, height);
 	}
 
 	void writeScrollOffsets()

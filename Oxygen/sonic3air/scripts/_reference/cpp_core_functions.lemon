@@ -483,3 +483,5 @@ declare function float AudioInstance:getPlaybackSpeed()
 declare function void AudioInstance:setPlaybackSpeed(float speed)
 declare function float AudioInstance:getPanning()
 declare function void AudioInstance:setPanning(float panning)
+
+declare function void Game.retroEvent(u32 event, u32 a, u32 b)

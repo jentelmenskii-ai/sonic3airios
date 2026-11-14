@@ -244,6 +244,9 @@ void Application::sdlEvent(const SDL_Event& ev)
 		case SDL_APP_WILLENTERBACKGROUND:
 		{
 			EngineMain::getDelegate().onApplicationLostFocus();
+		#if defined(PLATFORM_IOS)
+			Configuration::instance().saveSettings();
+		#endif
 			break;
 		}
 
@@ -724,8 +727,8 @@ void Application::render()
 		Profiling::pushRegion(ProfilingRegion::FRAMESYNC);
 
 		const double currentTime = mApplicationTimer.getSecondsSinceStart() * 1000.0;
-		const double tickLengthMilliseconds = 1000.0 / (double)mSimulation->getSimulationFrequency();
-		const bool usingFramecap = (drawer.getType() != Drawer::Type::OPENGL || Configuration::instance().mFrameSync != Configuration::FrameSyncType::VSYNC_ON) && (Configuration::instance().mFrameSync != Configuration::FrameSyncType::FRAME_INTERPOLATION);
+		const double tickLengthMilliseconds = 1000.0 / (Configuration::instance().mClassicMode ? 30.0 : (double)mSimulation->getSimulationFrequency());
+		const bool usingFramecap = Configuration::instance().mClassicMode || (drawer.getType() != Drawer::Type::OPENGL || Configuration::instance().mFrameSync != Configuration::FrameSyncType::VSYNC_ON) && (Configuration::instance().mFrameSync != Configuration::FrameSyncType::FRAME_INTERPOLATION);
 		if (usingFramecap)
 		{
 			double delay = mNextRefreshTime - currentTime;
