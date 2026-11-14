@@ -1452,7 +1452,17 @@ std::vector<Game::ReplayEntry> Game::listReplays()
         if (FTX::FileSystem->readFile(entry.filename, bytes) && s3air::ReplayData::decode(bytes, entry.data))
         {
             // The browser needs only metadata, not all recordings resident in memory.
-            entry.data.frames.clear(); entry.data.previousInputs.clear(); entry.data.state.clear(); entry.data.persistent.clear(); entry.data.settings.clear(); entry.data.events.clear(); entry.data.controls.clear(); entry.data.actions.clear();
+            // clear() retains vector capacity: whole-zone recordings would keep
+            // megabytes per browser row alive. Move only the visible metadata.
+            s3air::ReplayData metadata;
+            metadata.zoneAct = entry.data.zoneAct;
+            metadata.actTime = entry.data.actTime;
+            metadata.actTimes = entry.data.actTimes;
+            metadata.timestamp = entry.data.timestamp;
+            metadata.classic = entry.data.classic;
+            metadata.scope = entry.data.scope;
+            metadata.formatVersion = entry.data.formatVersion;
+            entry.data = std::move(metadata);
             result.push_back(std::move(entry));
         }
     }
